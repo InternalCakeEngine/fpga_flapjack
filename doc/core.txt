@@ -1,0 +1,53 @@
+Registers (all 16bit)
+#	Name	Purpose
+0	r0	General
+1	r1	General
+2	r2	General
+3	r3	General
+4	r4	General
+5	fl	Flags
+6	sp	Stack pointer
+7	ip	Instruction pointer
+
+
+Instruction format (all 16 bit)
+
+15             0
+|              |
+----------------
+ooooo-----------	Opcode		(0..31)
+-----xxx--------	Operand 1	(r0..r7 | 0..7)
+--------yyy-----	Operand 2	(r0..r7 | 0..7)
+-----------sffff	Condition/mod	(0..31)
+
+
+Memory is 65536 x 16bit words
+SP is full-decending.
+IP points to the currently executing instruction + 1.
+
+Flags:
+bit#	Meaning
+0	Always true	(instr condition)
+1	Equal		(instr condition)
+2	Greater than	(instr condition)
+3	Spare		(instr condition)
+4	Overflow
+..15
+
+Flag conditions
+sffff
+result = ( s ? r5&ffff : ~r5&ffff ) != 0
+
+Opcodes:
+#	Name	Function	Action
+00	nop	Nothing		Nothing
+01	jp	Jump		Jump to O1 if flag conditions are true else to O2
+02	br	Branch		Jump to ip+O1 if flag conditions are true else to ip+O2
+03	ld	Load		Read from memory address O1 into O2
+04	st	Store		Write O1 into memory address O2
+05	add	Add		Add O1 to O2
+06	sub	Sub		Sub O1 from O2
+07	cmp	Compare		Compare O1 to O2
+08	out	Write to IO	Write O1 into IO address O2
+..31
+
