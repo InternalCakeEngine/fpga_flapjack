@@ -65,8 +65,14 @@ module flapjack(
     logic [8:0] char_chr;
     logic char_str;
     
+    logic reset;
+    always_comb begin
+        reset = ~btn_rst_n;
+    end
+    
     flapjack_core core (
         .clk_sys,       // 125 MHz system clock
+        .reset,         // Reset when high.
         .char_x,        // Write location x
         .char_y,        // Write location y
         .char_chr,      // Write character

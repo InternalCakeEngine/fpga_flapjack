@@ -32,4 +32,4 @@ set_property -dict {PACKAGE_PIN J15 IOSTANDARD LVCMOS33} [get_ports {vga_b[3]}];
 ## Pixel Clock is async to System Clock
 set_clock_groups -name SysPixel -asynchronous \
     -group [get_clocks -of_objects [get_pins clock_sys_inst/MMCME2_BASE_inst/CLKOUT0]] \
-    -group [get_clocks -of_objects [get_pins clock_pix_inst/MMCME2_BASE_inst/CLKOUT1]];
+    -group [get_clocks -of_objects [get_pins textmode/clock_pix_inst/MMCME2_BASE_inst/CLKOUT1]];

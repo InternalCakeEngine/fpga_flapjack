@@ -91,7 +91,6 @@ module vga_textmode (
     );
     
     // Character array is in memory.
-    localparam CM_MESSAGE = "message.mem";
     localparam CM_CWIDTH = 8;
     localparam CM_MEXTENT = 80*30;
     localparam CM_ADDRW = $clog2(CM_MEXTENT);
@@ -102,8 +101,7 @@ module vga_textmode (
     logic cm_we = 0;
     bram_sdp #(
         .WIDTH(CM_CWIDTH),
-        .DEPTH(CM_MEXTENT),
-        .INIT_F(CM_MESSAGE)
+        .DEPTH(CM_MEXTENT)
     ) bram_cm_inst (
         .clk_write(clk_sys),
         .clk_read(clk_sys),

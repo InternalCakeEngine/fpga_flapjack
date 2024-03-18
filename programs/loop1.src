@@ -1,0 +1,38 @@
+0:
+	CONST	r1, 0x04	// Reset branch target
+	CONST	r2, 0x1		// Letter step size.
+	CONST	r3, 0x5c	// Character limit
+	CONST	r4, 0x05	// Address of non-reset jump
+	CONST	r0, 0x41	// Character A
+	OUT	r0, r1
+	ADD	r2, r0
+	CMP	r0, r3
+	JP.E	r1, r4
+	HALT
+
+oooooxxxyyysffff
+
+01001,001,00000100
+01001,010,00000001
+01001,011,01011100
+01001,100,00000101
+01001,000,01000001
+01000,000,001,10001
+00101,010,000,10001
+00111,000,011,10001
+00001,001,100,10010
+00000,000,000,00000
+
+4903	X
+4a01
+4b5c
+4c05	X
+0000
+4841	X
+4031
+2a11
+3871
+0992
+
+
+

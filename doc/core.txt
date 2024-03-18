@@ -19,6 +19,7 @@ ooooo-----------	Opcode		(0..31)
 -----xxx--------	Operand 1	(r0..r7 | 0..7)
 --------yyy-----	Operand 2	(r0..r7 | 0..7)
 -----------sffff	Condition/mod	(0..31)
+--------cccccccc	Constant	(0..255)
 
 
 Memory is 65536 x 16bit words
