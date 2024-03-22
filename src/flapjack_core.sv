@@ -34,28 +34,7 @@ module flapjack_core(
     logic [8:0] write_y = 0;
     logic [8:0] out_char = 0;
     logic out_char_strobe = 0;
-    /*
-    always_ff @(posedge clk_sys) begin
-        if( out_char_strobe ) begin
-            char_x <= write_x;
-            char_y <= write_y;
-            char_chr <= out_char;
-            char_str <= 1;  // Assert strobe for only 1 cycle.
-            if( write_x == 79 ) begin
-                write_x <= 0;
-                if( write_y == 29 ) begin
-                    write_y <= 0;
-                end else begin
-                    write_y += 1;
-                end
-             end else begin
-                write_x += 1;
-             end
-        end
-    end
-    */
-    
-    
+        
     // Build a ticker at a reasonable rate (1ms).
     localparam TICK_MINOR_LIMIT = 125_000;
     localparam TICK_MINOR_WIDTH = $clog2(TICK_MINOR_LIMIT);
@@ -97,44 +76,11 @@ module flapjack_core(
     
     
     localparam REGWIDTH = 16;
-    localparam REGCOUNT = 8;
+    localparam REGCOUNT = 16;
     logic [REGWIDTH-1:0] regs[REGCOUNT];
-    localparam REG_IP = 7;
-    localparam REG_FLAGS = 6;
+    localparam REG_IP = 15;
+    localparam REG_FLAGS = 13;
 
-    // A register file and access
-    // Having this behind an interface doesn't make much sense atm.
-    /*
-    logic [15:0] regfile_read_index1;
-    logic [15:0] regfile_read_value1;
-    logic [15:0] regfile_read_index2;
-    logic [15:0] regfile_read_value2;
-    logic [15:0] regfile_write_index;
-    logic [15:0] regfile_write_value;
-    logic        regfile_write_strobe;
-    flapjack_regfile #(
-        .WIDTH(16),
-        .COUNT(8)
-    ) regfile (
-        .clk(clk_sys),
-        .read_index1(regfile_read_index1),
-        .read_value1(regfile_read_value1),
-        .read_index2(regfile_read_index2),
-        .read_value2(regfile_read_value2),
-        .write_index(regfile_write_index),
-        .write_value(regfile_write_value),
-        .write_strobe(regfile_write_strobe),
-        .rawr0(rawr0),
-        .rawr1(rawr1),
-        .rawr2(rawr2),
-        .rawr3(rawr3),
-        .rawr4(rawr4),
-        .rawr5(rawr5),
-        .rawr6(rawr6),
-        .rawr7(rawr7)
-    );
-    */
-    
     // Give opcodes names
     localparam OP_NOP = 0;
     localparam OP_JP = 1;
@@ -146,6 +92,9 @@ module flapjack_core(
     localparam OP_CMP = 7;
     localparam OP_OUT = 8;
     localparam OP_CONST = 9;
+    localparam OP_AND = 10;
+    localparam OP_MOV = 11;
+    localparam OP_SHR = 12;
     
     // Set of states for the core.
     enum {
@@ -163,25 +112,26 @@ module flapjack_core(
         DO_OUT,                 // Poke device.
         DO_CONST,               // Transfer bits from the instruction.
         DO_ADD,                 // Arith.
+        DO_AND,                 // Arith.
+        DO_MOV,                 // Arith.
+        DO_SHR,                 // Arith.
         STEP                    // Move to the next instr (for non-branching).
     } core_state=RESET;
     
     // Decoding parts.
     logic [15:0] instr;
     logic [15:0] ro_flags;
-    logic [4:0] raw_opcode;
-    logic [2:0] raw_op1;
-    logic [2:0] raw_op2;
-    logic [4:0] raw_cond;
+    logic [3:0] raw_opcode;
+    logic [3:0] raw_op1;
+    logic [3:0] raw_op2;
+    logic [3:0] raw_cond;
     logic [15:0] op1;
     logic [15:0] op2;
     logic condtrue;
+    logic opmode;
     logic [15:0] ip_current;
     
-    always_comb begin
-        raw_core_state = core_state;
-    end
-    
+    // We run the whole thing at half speed to sidestep some latency issues.    
     logic skip_tick;
     logic proc_tick;
     always_ff @(posedge clk_sys) begin
@@ -217,42 +167,61 @@ module flapjack_core(
                 end
                 IFETCH_READ: begin
                     instr <= mem_word_read;
-                    raw_op1 <= mem_word_read[10:8];
-                    op1 <= regs[mem_word_read[10:8]];
-                    raw_op2 <= mem_word_read[7:5];
-                    op2 <= regs[mem_word_read[7:5]];
-                    raw_opcode <= mem_word_read[15:11];
-                    raw_cond <= mem_word_read[4:0];
+                    raw_op1 <= mem_word_read[11:8];
+                    op1 <= regs[mem_word_read[11:8]];
+                    raw_op2 <= mem_word_read[7:4];
+                    op2 <= regs[mem_word_read[7:4]];
+                    raw_opcode <= mem_word_read[15:12];
+                    raw_cond <= mem_word_read[3:0];
                     core_state <= DECODE;
                 end
                 DECODE: begin
-                    condtrue <= ( raw_cond[4] ? raw_cond[3:0]&ro_flags[3:0] : raw_cond[3:0]&~ro_flags[3:0] ) != 0;
                     case( raw_opcode )
                         OP_NOP: begin
                             core_state <= HALT;
                         end
                         OP_JP: begin
+                            condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
                             core_state <= DO_JP;
                         end
                         OP_BR: begin
+                            condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
                             core_state <= STEP;
                         end
                         OP_LD: begin
+                            opmode <= raw_cond[3];
                             core_state <= DO_LD_1;
                         end
                         OP_ST: begin
+                            opmode <= raw_cond[3];
                             core_state <= DO_ST;
                         end
                         OP_ADD: begin
+                            opmode <= raw_cond[3];
                             core_state <= DO_ADD;
                         end
                         OP_SUB: begin
+                            opmode <= raw_cond[3];
                             core_state <= STEP;
                         end
+                        OP_AND: begin
+                            opmode <= raw_cond[3];
+                            core_state <= DO_AND;
+                        end
+                        OP_SHR: begin
+                            opmode <= raw_cond[3];
+                            core_state <= DO_SHR;
+                        end
+                        OP_MOV: begin
+                            opmode <= raw_cond[3];
+                            core_state <= DO_MOV;
+                        end
                         OP_CMP: begin
+                            opmode <= raw_cond[3];
                             core_state <= DO_CMP;
                         end
                         OP_OUT: begin
+                            opmode <= raw_cond[3];
                             core_state <= DO_OUT;
                         end
                         OP_CONST: begin
@@ -270,46 +239,87 @@ module flapjack_core(
                     core_state <= IFETCH_SETUP;    // Not STEP!
                 end
                 DO_LD_1: begin
-                    if( condtrue ) begin
+                    if( opmode ) begin
+                        regs[raw_op2] <= raw_op1;
+                        core_state <= STEP;
+                    end else begin
                         mem_addr_read <= op1;
                         core_state <= DO_LD_2;
-                    end else begin
-                        core_state <= STEP;
                     end
                 end
                 DO_LD_2: begin
-                    if( condtrue ) begin
-                        regs[raw_op2] <= mem_word_read;
-                        core_state <= STEP;
-                    end
+                    regs[raw_op2] <= mem_word_read;
+                    core_state <= STEP;
                 end
                 DO_ST: begin
-                    if( condtrue ) begin
+                    if( opmode ) begin
+                        mem_word_write <= raw_op1;
+                    end else begin
                         mem_word_write <= op1;
-                        mem_addr_write <= op2;
-                        mem_strobe <= 1;
                     end
+                    mem_addr_write <= op2;
+                    mem_strobe <= 1;
                     core_state <= STEP;
                 end
                 DO_CMP: begin
-                    regs[REG_FLAGS] <= { ro_flags[15:4],
-                                         1'b0,
-                                         op1>op2,
-                                         op1==op2,
-                                         1'b1 };
+                    if( opmode ) begin
+                        regs[REG_FLAGS] <= { ro_flags[15:3],
+                                             raw_op1>op2,
+                                             raw_op1==op2,
+                                             1'b1 };
+                    end else begin
+                        regs[REG_FLAGS] <= { ro_flags[15:3],
+                                             op1>op2,
+                                             op1==op2,
+                                             1'b1 };
+                    end
                     core_state <= STEP;                                        
                 end
                 DO_CONST: begin
-                    regs[raw_op1] <={8'b0,instr[7:0]};
-                    core_state <= STEP;                            
+                    regs[raw_op1] <= {regs[raw_op1][7:0],instr[7:0]};
+                    core_state <= STEP;
                 end
                 DO_ADD: begin
-                    regs[raw_op2] = op1+op2;
+                    if( opmode ) begin
+                        regs[raw_op2] = raw_op1+op2;
+                    end else begin
+                        regs[raw_op2] = op1+op2;
+                    end
+                    core_state <= STEP;
+                end
+                DO_AND: begin
+                    if( opmode ) begin
+                        regs[raw_op2] = raw_op1&op2;
+                    end else begin
+                        regs[raw_op2] = op1&op2;
+                    end
+                    core_state <= STEP;
+                end
+                DO_SHR: begin
+                    if( opmode ) begin
+                        regs[raw_op2] = op2>>raw_op1;
+                    end else begin
+                        regs[raw_op2] = op2>>op1;
+                    end
+                    core_state <= STEP;
+                end
+                DO_MOV: begin
+                    if( opmode ) begin
+                        regs[raw_op2] = raw_op1;
+                    end else begin
+                        regs[raw_op2] = op1;
+                    end
                     core_state <= STEP;
                 end
                 DO_OUT: begin
-                    out_char <= op1[7:0];
-                    //out_char_strobe <= 1;
+                    if( opmode ) begin
+                        out_char <= {4'b0,raw_op1};
+                    end else begin
+                        out_char <= op1[7:0];
+                    end
+                    write_x <= op2[15:8];
+                    write_y <= op2[7:0];
+                    out_char_strobe <= 1;
                     core_state <= STEP;                                        
                 end
                 STEP: begin     // Only for instructions which step one forward!
@@ -319,52 +329,99 @@ module flapjack_core(
             endcase
         end
     end
+    
+    // Debug output
     logic [15:0] raw_core_state;
+    always_comb begin
+        raw_core_state = core_state;
+    end
     logic [8:0] showstate = 0;
     always_ff @(posedge clk_sys) begin
         char_str <= 0;
-        case(showstate)
-            0: begin char_x <= 0; char_y <= 0; char_chr <= out_char; char_str <= 1; end
-            1: begin char_x <= 1; char_y <= 0; char_chr <= reset? 8'h52 : 8'h66 ; char_str <= 1; end
-            2: begin char_x <= 2; char_y <= 0; char_chr <= raw_core_state+48; char_str <= 1; end            
-            3: begin char_x <= 3; char_y <= 0; char_chr <= regs[0][15:12]+48; char_str <= 1; end
-            4: begin char_x <= 4; char_y <= 0; char_chr <= regs[0][11:8]+48; char_str <= 1; end
-            5: begin char_x <= 5; char_y <= 0; char_chr <= regs[0][7:4]+48; char_str <= 1; end
-            6: begin char_x <= 6; char_y <= 0; char_chr <= regs[0][3:0]+48; char_str <= 1; end
-            7: begin char_x <= 3; char_y <= 1; char_chr <= regs[1][15:12]+48; char_str <= 1; end
-            8: begin char_x <= 4; char_y <= 1; char_chr <= regs[1][11:8]+48; char_str <= 1; end
-            9: begin char_x <= 5; char_y <= 1; char_chr <= regs[1][7:4]+48; char_str <= 1; end
-            10: begin char_x <= 6; char_y <= 1; char_chr <= regs[1][3:0]+48; char_str <= 1; end
-            11: begin char_x <= 3; char_y <= 2; char_chr <= regs[2][15:12]+48; char_str <= 1; end
-            12: begin char_x <= 4; char_y <= 2; char_chr <= regs[2][11:8]+48; char_str <= 1; end
-            13: begin char_x <= 5; char_y <= 2; char_chr <= regs[2][7:4]+48; char_str <= 1; end
-            14: begin char_x <= 6; char_y <= 2; char_chr <= regs[2][3:0]+48; char_str <= 1; end
-            15: begin char_x <= 3; char_y <= 3; char_chr <= regs[3][15:12]+48; char_str <= 1; end
-            16: begin char_x <= 4; char_y <= 3; char_chr <= regs[3][11:8]+48; char_str <= 1; end
-            17: begin char_x <= 5; char_y <= 3; char_chr <= regs[3][7:4]+48; char_str <= 1; end
-            18: begin char_x <= 6; char_y <= 3; char_chr <= regs[3][3:0]+48; char_str <= 1; end
-            19: begin char_x <= 3; char_y <= 4; char_chr <= regs[4][15:12]+48; char_str <= 1; end
-            20: begin char_x <= 4; char_y <= 4; char_chr <= regs[4][11:8]+48; char_str <= 1; end
-            21: begin char_x <= 5; char_y <= 4; char_chr <= regs[4][7:4]+48; char_str <= 1; end
-            22: begin char_x <= 6; char_y <= 4; char_chr <= regs[4][3:0]+48; char_str <= 1; end
-            23: begin char_x <= 3; char_y <= 5; char_chr <= regs[5][15:12]+48; char_str <= 1; end
-            24: begin char_x <= 4; char_y <= 5; char_chr <= regs[5][11:8]+48; char_str <= 1; end
-            25: begin char_x <= 5; char_y <= 5; char_chr <= regs[5][7:4]+48; char_str <= 1; end
-            26: begin char_x <= 6; char_y <= 5; char_chr <= regs[5][3:0]+48; char_str <= 1; end
-            27: begin char_x <= 3; char_y <= 6; char_chr <= regs[6][15:12]+48; char_str <= 1; end
-            28: begin char_x <= 4; char_y <= 6; char_chr <= regs[6][11:8]+48; char_str <= 1; end
-            29: begin char_x <= 5; char_y <= 6; char_chr <= regs[6][7:4]+48; char_str <= 1; end
-            30: begin char_x <= 6; char_y <= 6; char_chr <= regs[6][3:0]+48; char_str <= 1; end
-            31: begin char_x <= 3; char_y <= 7; char_chr <= regs[7][15:12]+48; char_str <= 1; end
-            32: begin char_x <= 4; char_y <= 7; char_chr <= regs[7][11:8]+48; char_str <= 1; end
-            33: begin char_x <= 5; char_y <= 7; char_chr <= regs[7][7:4]+48; char_str <= 1; end
-            34: begin char_x <= 6; char_y <= 7; char_chr <= regs[7][3:0]+48; char_str <= 1; end
-            default: begin end
-        endcase
-        if( showstate == 100 ) begin
-           showstate <= 0;
+        if( out_char_strobe ) begin
+            char_x <= write_x;
+            char_y <= write_y;
+            char_chr <= out_char;
+            char_str <= 1;
         end else begin
-            showstate <= showstate+1;
+            case(showstate)
+                0: begin char_x <= 0; char_y <= 0; char_chr <= out_char; char_str <= 1; end
+                1: begin char_x <= 1; char_y <= 0; char_chr <= reset? 8'h52 : 8'h66 ; char_str <= 1; end
+                2: begin char_x <= 2; char_y <= 0; char_chr <= raw_core_state+48; char_str <= 1; end
+                3: begin char_x <= 3; char_y <= 0; char_chr <= regs[0][15:12]+48; char_str <= 1; end
+                4: begin char_x <= 4; char_y <= 0; char_chr <= regs[0][11:8]+48; char_str <= 1; end
+                5: begin char_x <= 5; char_y <= 0; char_chr <= regs[0][7:4]+48; char_str <= 1; end
+                6: begin char_x <= 6; char_y <= 0; char_chr <= regs[0][3:0]+48; char_str <= 1; end
+                7: begin char_x <= 3; char_y <= 1; char_chr <= regs[1][15:12]+48; char_str <= 1; end
+                8: begin char_x <= 4; char_y <= 1; char_chr <= regs[1][11:8]+48; char_str <= 1; end
+                9: begin char_x <= 5; char_y <= 1; char_chr <= regs[1][7:4]+48; char_str <= 1; end
+                10: begin char_x <= 6; char_y <= 1; char_chr <= regs[1][3:0]+48; char_str <= 1; end
+                11: begin char_x <= 3; char_y <= 2; char_chr <= regs[2][15:12]+48; char_str <= 1; end
+                12: begin char_x <= 4; char_y <= 2; char_chr <= regs[2][11:8]+48; char_str <= 1; end
+                13: begin char_x <= 5; char_y <= 2; char_chr <= regs[2][7:4]+48; char_str <= 1; end
+                14: begin char_x <= 6; char_y <= 2; char_chr <= regs[2][3:0]+48; char_str <= 1; end
+                15: begin char_x <= 3; char_y <= 3; char_chr <= regs[3][15:12]+48; char_str <= 1; end
+                16: begin char_x <= 4; char_y <= 3; char_chr <= regs[3][11:8]+48; char_str <= 1; end
+                17: begin char_x <= 5; char_y <= 3; char_chr <= regs[3][7:4]+48; char_str <= 1; end
+                18: begin char_x <= 6; char_y <= 3; char_chr <= regs[3][3:0]+48; char_str <= 1; end
+                19: begin char_x <= 3; char_y <= 4; char_chr <= regs[4][15:12]+48; char_str <= 1; end
+                20: begin char_x <= 4; char_y <= 4; char_chr <= regs[4][11:8]+48; char_str <= 1; end
+                21: begin char_x <= 5; char_y <= 4; char_chr <= regs[4][7:4]+48; char_str <= 1; end
+                22: begin char_x <= 6; char_y <= 4; char_chr <= regs[4][3:0]+48; char_str <= 1; end
+                23: begin char_x <= 3; char_y <= 5; char_chr <= regs[5][15:12]+48; char_str <= 1; end
+                24: begin char_x <= 4; char_y <= 5; char_chr <= regs[5][11:8]+48; char_str <= 1; end
+                25: begin char_x <= 5; char_y <= 5; char_chr <= regs[5][7:4]+48; char_str <= 1; end
+                26: begin char_x <= 6; char_y <= 5; char_chr <= regs[5][3:0]+48; char_str <= 1; end
+                27: begin char_x <= 3; char_y <= 6; char_chr <= regs[6][15:12]+48; char_str <= 1; end
+                28: begin char_x <= 4; char_y <= 6; char_chr <= regs[6][11:8]+48; char_str <= 1; end
+                29: begin char_x <= 5; char_y <= 6; char_chr <= regs[6][7:4]+48; char_str <= 1; end
+                30: begin char_x <= 6; char_y <= 6; char_chr <= regs[6][3:0]+48; char_str <= 1; end
+                31: begin char_x <= 3; char_y <= 7; char_chr <= regs[7][15:12]+48; char_str <= 1; end
+                32: begin char_x <= 4; char_y <= 7; char_chr <= regs[7][11:8]+48; char_str <= 1; end
+                33: begin char_x <= 5; char_y <= 7; char_chr <= regs[7][7:4]+48; char_str <= 1; end
+                34: begin char_x <= 6; char_y <= 7; char_chr <= regs[7][3:0]+48; char_str <= 1; end
+    
+                35: begin char_x <= 3; char_y <= 8; char_chr <= regs[8][15:12]+48; char_str <= 1; end
+                36: begin char_x <= 4; char_y <= 8; char_chr <= regs[8][11:8]+48; char_str <= 1; end
+                37: begin char_x <= 5; char_y <= 8; char_chr <= regs[8][7:4]+48; char_str <= 1; end
+                38: begin char_x <= 6; char_y <= 8; char_chr <= regs[8][3:0]+48; char_str <= 1; end
+                39: begin char_x <= 3; char_y <= 9; char_chr <= regs[9][15:12]+48; char_str <= 1; end
+                40: begin char_x <= 4; char_y <= 9; char_chr <= regs[9][11:8]+48; char_str <= 1; end
+                41: begin char_x <= 5; char_y <= 9; char_chr <= regs[9][7:4]+48; char_str <= 1; end
+                42: begin char_x <= 6; char_y <= 9; char_chr <= regs[9][3:0]+48; char_str <= 1; end
+                43: begin char_x <= 3; char_y <= 10; char_chr <= regs[10][15:12]+48; char_str <= 1; end
+                44: begin char_x <= 4; char_y <= 10; char_chr <= regs[10][11:8]+48; char_str <= 1; end
+                45: begin char_x <= 5; char_y <= 10; char_chr <= regs[10][7:4]+48; char_str <= 1; end
+                46: begin char_x <= 6; char_y <= 10; char_chr <= regs[10][3:0]+48; char_str <= 1; end
+                47: begin char_x <= 3; char_y <= 11; char_chr <= regs[11][15:12]+48; char_str <= 1; end
+                48: begin char_x <= 4; char_y <= 11; char_chr <= regs[11][11:8]+48; char_str <= 1; end
+                49: begin char_x <= 5; char_y <= 11; char_chr <= regs[11][7:4]+48; char_str <= 1; end
+                50: begin char_x <= 6; char_y <= 11; char_chr <= regs[11][3:0]+48; char_str <= 1; end
+                51: begin char_x <= 3; char_y <= 12; char_chr <= regs[12][15:12]+48; char_str <= 1; end
+                52: begin char_x <= 4; char_y <= 12; char_chr <= regs[12][11:8]+48; char_str <= 1; end
+                53: begin char_x <= 5; char_y <= 12; char_chr <= regs[12][7:4]+48; char_str <= 1; end
+                54: begin char_x <= 6; char_y <= 12; char_chr <= regs[12][3:0]+48; char_str <= 1; end
+                55: begin char_x <= 3; char_y <= 13; char_chr <= regs[13][15:12]+48; char_str <= 1; end
+                56: begin char_x <= 4; char_y <= 13; char_chr <= regs[13][11:8]+48; char_str <= 1; end
+                57: begin char_x <= 5; char_y <= 13; char_chr <= regs[13][7:4]+48; char_str <= 1; end
+                58: begin char_x <= 6; char_y <= 13; char_chr <= regs[13][3:0]+48; char_str <= 1; end
+                59: begin char_x <= 3; char_y <= 14; char_chr <= regs[14][15:12]+48; char_str <= 1; end
+                60: begin char_x <= 4; char_y <= 14; char_chr <= regs[14][11:8]+48; char_str <= 1; end
+                61: begin char_x <= 5; char_y <= 14; char_chr <= regs[14][7:4]+48; char_str <= 1; end
+                62: begin char_x <= 6; char_y <= 14; char_chr <= regs[14][3:0]+48; char_str <= 1; end
+                63: begin char_x <= 3; char_y <= 15; char_chr <= regs[15][15:12]+48; char_str <= 1; end
+                64: begin char_x <= 4; char_y <= 15; char_chr <= regs[15][11:8]+48; char_str <= 1; end
+                65: begin char_x <= 5; char_y <= 15; char_chr <= regs[15][7:4]+48; char_str <= 1; end
+                66: begin char_x <= 6; char_y <= 15; char_chr <= regs[15][3:0]+48; char_str <= 1; end
+    
+    
+                default: begin end
+            endcase
+            if( showstate == 100 ) begin
+               showstate <= 0;
+            end else begin
+                showstate <= showstate+1;
+            end
         end
     end
 

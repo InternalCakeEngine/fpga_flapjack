@@ -49,7 +49,20 @@ def strip_completely( line ):
 
 
 def get_regnum(rstr):
+    if rstr=="ip":
+        return 7
+    if rstr=="f":
+        return 6
     return int(rstr[1:])
+
+def get_smallvalue(vstr):
+    return int(vstr,0)%0x10
+
+def get_opmode(rstr):
+    if rstr[0]=='r':
+        return 0
+    else:
+        return 1
 
 def get_cond(cstr):
     seen_pos = False
@@ -77,8 +90,29 @@ def get_cond(cstr):
     if not ( seen_pos or seen_neg ):
         return None
     if seen_pos:
-        f |= 16
+        f |= 8
     return f
+
+fmt1 = {
+    "jp":1,
+    "br":2,
+}
+
+fmt2 = {
+    "ld":3,
+    "st":3,
+    "add":5,
+    "sub":6,
+    "cmp":7,
+    "out":8,
+    "and":10,
+    "mov":11,
+    "shr":12,
+}
+
+fmt3 = {
+    "const": 9,
+}
 
 def do_assembly( filename, lines ):
     target_address = 0
@@ -128,37 +162,41 @@ def do_assembly( filename, lines ):
             val = 0
             if instr[0] == "halt":
                 val = 0
-            elif instr[0] == "const":
+            elif instr[0] in fmt1:
+                r1 = get_regnum(ops[0])
+                r2 = get_regnum(ops[1])
+                cc = get_cond(instr[1])
+                if not cc:
+                    print(f"Failed to parse condition code '{instr[1]}'. Skipping output for '{filename}'")
+                    return None
+                oc = fmt1[instr[0]]
+                val = (oc<<12) | (r1<<8) | (r2<<4) | cc
+            elif instr[0] in fmt2:
+                a = get_opmode(ops[0])
+                if a==1:
+                    r1 = get_smallvalue(ops[0])
+                else:
+                    r1 = get_regnum(ops[0])
+                r2 = get_regnum(ops[1])
+                oc = fmt2[instr[0]]
+                val = (oc<<12) | (r1<<8) | (r2<<4) | (a<<3)
+            elif instr[0] in fmt3:
                 r = get_regnum(ops[0])
                 c = 0
                 try:
                     c = int(ops[1],0) % 256
                 except:
                     relocs.append((target_address,"lowbyte",ops[1]))
-                val = (9<<11) | (r<<8) | c
-            elif instr[0] == "out":
-                r1 = get_regnum(ops[0])
-                r2 = get_regnum(ops[1])
-                cc = get_cond(instr[1])
-                if not cc:
-                    print(f"Failed to parse condition code '{instr[1]}'. Skipping output for '{filename}'")
-                    return None
-                val = (8<<11) | (r1<<8) | (r2<<5) | cc
-            elif instr[0] in ["cmp","jp","add","sub"]:
-                r1 = get_regnum(ops[0])
-                r2 = get_regnum(ops[1])
-                cc = get_cond(instr[1])
-                if not cc:
-                    print(f"Failed to parse condition code '{instr[1]}'. Skipping output for '{filename}'")
-                    return None
-                oc = {"cmp":7,"jp":1,"add":5,"sub":6}[instr[0]]
-                val = (oc<<11) | (r1<<8) | (r2<<5) | cc
+                oc = fmt3[instr[0]]
+                val = (oc<<12) | (r<<8) | c
             else:
                 print(f"Unknown opcode '{instr[0]}'. Skipping output for '{filename}'.")
                 return None
             if val != None:
                 outvals.append(val)
                 target_address += 1
+
+    # Apply local relocations.
     for (tgt,mode,valt) in relocs:
         if valt not in labels:
                 print(f"Attempt to use label '{valt}' not resolved. Skipping output for '{filename}'")
@@ -167,7 +205,9 @@ def do_assembly( filename, lines ):
         if mode=="word":
             outvals[tgt] = val
         elif mode=="lowbyte":
-            outvals[tgt] = (outvals[tgt]&0xff00)|val
+            outvals[tgt] = (outvals[tgt]&0xff00)|(val&0xff)
+        elif mode=="hibyte":
+            outvals[tgt] = (outvals[tgt]&0xff00)|((val>>8)&0xff)
         else:
             print(f"Failed to apply reloc '{mode}' using '{valt}'. Skipping output for '{filename}'")
             return None
