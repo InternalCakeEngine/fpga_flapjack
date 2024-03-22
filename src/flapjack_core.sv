@@ -99,7 +99,8 @@ module flapjack_core(
     // Set of states for the core.
     enum {
         HALT,                   // Stop, permanently.
-        RESET,                  // Do nothing but reset the IP.
+        RESET,                  // Do nothing but reset the Ile P.
+        PAUSE,                  // Empty cycle to allow for memory latency.
         IFETCH_SETUP,           // Fetch IP from the register file and the flags.
         IFETCH_READ_SETUP,      // Start memory fetch for an instruction.
         IFETCH_READ,            // Read the instruction, and setup op fetching.
@@ -116,7 +117,7 @@ module flapjack_core(
         DO_MOV,                 // Arith.
         DO_SHR,                 // Arith.
         STEP                    // Move to the next instr (for non-branching).
-    } core_state=RESET;
+    } core_state=RESET, post_pause_state=HALT;
     
     // Decoding parts.
     logic [15:0] instr;
@@ -130,203 +131,205 @@ module flapjack_core(
     logic condtrue;
     logic opmode;
     logic [15:0] ip_current;
+
+    // Pseudo stobe to induce a wait between read set-up and result collection.    
+    logic mem_read_strobe = 0;
     
-    // We run the whole thing at half speed to sidestep some latency issues.    
-    logic skip_tick;
-    logic proc_tick;
     always_ff @(posedge clk_sys) begin
-        if( skip_tick ) begin
-            proc_tick ^= 1;
-        end
-        skip_tick ^= 1;
-    end
-    
-    always_ff @(posedge proc_tick) begin
         mem_strobe <= 0;                // One cycle only.
         out_char_strobe <= 0;
-        if( reset ) begin
-            core_state <= RESET;
+        if( mem_read_strobe ) begin
+            mem_read_strobe <= 0;
         end else begin
-            case( core_state )
-                RESET: begin
-                    if( reset ) begin
-                        regs[REG_IP] <= 0;
-                        core_state <= RESET;
-                    end else begin
+            if( reset ) begin
+                core_state <= RESET;
+            end else begin
+                case( core_state )
+                    RESET: begin
+                        if( reset ) begin
+                            regs[REG_IP] <= 0;
+                            core_state <= RESET;
+                        end else begin
+                            core_state <= IFETCH_SETUP;
+                        end
+                    end
+                    HALT: begin
+                        core_state <= HALT;
+                    end
+                    PAUSE: begin
+                        core_state <= post_pause_state;
+                    end
+                    IFETCH_SETUP: begin
+                        ip_current <= regs[REG_IP];
+                        mem_addr_read <= regs[REG_IP];
+                        ro_flags <= regs[REG_FLAGS];
+                        core_state <= IFETCH_READ;
+                        mem_read_strobe <= 1;
+                    end
+                    IFETCH_READ: begin
+                        instr <= mem_word_read;
+                        raw_op1 <= mem_word_read[11:8];
+                        op1 <= regs[mem_word_read[11:8]];
+                        raw_op2 <= mem_word_read[7:4];
+                        op2 <= regs[mem_word_read[7:4]];
+                        raw_opcode <= mem_word_read[15:12];
+                        raw_cond <= mem_word_read[3:0];
+                        core_state <= DECODE;
+                    end
+                    DECODE: begin
+                        case( raw_opcode )
+                            OP_NOP: begin
+                                core_state <= HALT;
+                            end
+                            OP_JP: begin
+                                condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
+                                core_state <= DO_JP;
+                            end
+                            OP_BR: begin
+                                condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
+                                core_state <= STEP;
+                            end
+                            OP_LD: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_LD_1;
+                            end
+                            OP_ST: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_ST;
+                            end
+                            OP_ADD: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_ADD;
+                            end
+                            OP_SUB: begin
+                                opmode <= raw_cond[3];
+                                core_state <= STEP;
+                            end
+                            OP_AND: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_AND;
+                            end
+                            OP_SHR: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_SHR;
+                            end
+                            OP_MOV: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_MOV;
+                            end
+                            OP_CMP: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_CMP;
+                            end
+                            OP_OUT: begin
+                                opmode <= raw_cond[3];
+                                core_state <= DO_OUT;
+                            end
+                            OP_CONST: begin
+                                core_state <= DO_CONST;
+                            end                    
+                            default: core_state <= STEP;
+                        endcase
+                    end
+                    DO_JP: begin
+                        if( condtrue ) begin
+                            regs[REG_IP] <= op1;
+                        end else begin
+                            regs[REG_IP] <= op2;
+                        end
+                        core_state <= IFETCH_SETUP;    // Not STEP!
+                    end
+                    DO_LD_1: begin
+                        if( opmode ) begin
+                            regs[raw_op2] <= raw_op1;
+                            core_state <= STEP;
+                        end else begin
+                            mem_addr_read <= op1;
+                            core_state <= DO_LD_2;
+                            mem_read_strobe <= 1;
+                        end
+                    end
+                    DO_LD_2: begin
+                        regs[raw_op2] <= mem_word_read;
+                        core_state <= STEP;
+                    end
+                    DO_ST: begin
+                        if( opmode ) begin
+                            mem_word_write <= raw_op1;
+                        end else begin
+                            mem_word_write <= op1;
+                        end
+                        mem_addr_write <= op2;
+                        mem_strobe <= 1;
+                        core_state <= STEP;
+                    end
+                    DO_CMP: begin
+                        if( opmode ) begin
+                            regs[REG_FLAGS] <= { ro_flags[15:3],
+                                                 raw_op1>op2,
+                                                 raw_op1==op2,
+                                                 1'b1 };
+                        end else begin
+                            regs[REG_FLAGS] <= { ro_flags[15:3],
+                                                 op1>op2,
+                                                 op1==op2,
+                                                 1'b1 };
+                        end
+                        core_state <= STEP;                                        
+                    end
+                    DO_CONST: begin
+                        regs[raw_op1] <= {regs[raw_op1][7:0],instr[7:0]};
+                        core_state <= STEP;
+                    end
+                    DO_ADD: begin
+                        if( opmode ) begin
+                            regs[raw_op2] = raw_op1+op2;
+                        end else begin
+                            regs[raw_op2] = op1+op2;
+                        end
+                        core_state <= STEP;
+                    end
+                    DO_AND: begin
+                        if( opmode ) begin
+                            regs[raw_op2] = raw_op1&op2;
+                        end else begin
+                            regs[raw_op2] = op1&op2;
+                        end
+                        core_state <= STEP;
+                    end
+                    DO_SHR: begin
+                        if( opmode ) begin
+                            regs[raw_op2] = op2>>raw_op1;
+                        end else begin
+                            regs[raw_op2] = op2>>op1;
+                        end
+                        core_state <= STEP;
+                    end
+                    DO_MOV: begin
+                        if( opmode ) begin
+                            regs[raw_op2] = raw_op1;
+                        end else begin
+                            regs[raw_op2] = op1;
+                        end
+                        core_state <= STEP;
+                    end
+                    DO_OUT: begin
+                        if( opmode ) begin
+                            out_char <= {4'b0,raw_op1};
+                        end else begin
+                            out_char <= op1[7:0];
+                        end
+                        write_x <= op2[15:8];
+                        write_y <= op2[7:0];
+                        out_char_strobe <= 1;
+                        core_state = STEP;
+                    end
+                    STEP: begin     // Only for instructions which step one forward!
+                        regs[REG_IP] <= regs[REG_IP]+1;
                         core_state <= IFETCH_SETUP;
                     end
-                end
-                HALT: begin
-                    core_state <= HALT;
-                end
-                IFETCH_SETUP: begin
-                    ip_current <= regs[REG_IP];
-                    mem_addr_read <= regs[REG_IP];
-                    ro_flags <= regs[REG_FLAGS];
-                    core_state <= IFETCH_READ;
-                end
-                IFETCH_READ: begin
-                    instr <= mem_word_read;
-                    raw_op1 <= mem_word_read[11:8];
-                    op1 <= regs[mem_word_read[11:8]];
-                    raw_op2 <= mem_word_read[7:4];
-                    op2 <= regs[mem_word_read[7:4]];
-                    raw_opcode <= mem_word_read[15:12];
-                    raw_cond <= mem_word_read[3:0];
-                    core_state <= DECODE;
-                end
-                DECODE: begin
-                    case( raw_opcode )
-                        OP_NOP: begin
-                            core_state <= HALT;
-                        end
-                        OP_JP: begin
-                            condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
-                            core_state <= DO_JP;
-                        end
-                        OP_BR: begin
-                            condtrue <= ( raw_cond[3] ? raw_cond[2:0]&{ro_flags[2:1],1'b1} : raw_cond[2:0]&~{ro_flags[2:0],1'b1} ) != 0;
-                            core_state <= STEP;
-                        end
-                        OP_LD: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_LD_1;
-                        end
-                        OP_ST: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_ST;
-                        end
-                        OP_ADD: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_ADD;
-                        end
-                        OP_SUB: begin
-                            opmode <= raw_cond[3];
-                            core_state <= STEP;
-                        end
-                        OP_AND: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_AND;
-                        end
-                        OP_SHR: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_SHR;
-                        end
-                        OP_MOV: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_MOV;
-                        end
-                        OP_CMP: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_CMP;
-                        end
-                        OP_OUT: begin
-                            opmode <= raw_cond[3];
-                            core_state <= DO_OUT;
-                        end
-                        OP_CONST: begin
-                            core_state <= DO_CONST;
-                        end                    
-                        default: core_state <= STEP;
-                    endcase
-                end
-                DO_JP: begin
-                    if( condtrue ) begin
-                        regs[REG_IP] <= op1;
-                    end else begin
-                        regs[REG_IP] <= op2;
-                    end
-                    core_state <= IFETCH_SETUP;    // Not STEP!
-                end
-                DO_LD_1: begin
-                    if( opmode ) begin
-                        regs[raw_op2] <= raw_op1;
-                        core_state <= STEP;
-                    end else begin
-                        mem_addr_read <= op1;
-                        core_state <= DO_LD_2;
-                    end
-                end
-                DO_LD_2: begin
-                    regs[raw_op2] <= mem_word_read;
-                    core_state <= STEP;
-                end
-                DO_ST: begin
-                    if( opmode ) begin
-                        mem_word_write <= raw_op1;
-                    end else begin
-                        mem_word_write <= op1;
-                    end
-                    mem_addr_write <= op2;
-                    mem_strobe <= 1;
-                    core_state <= STEP;
-                end
-                DO_CMP: begin
-                    if( opmode ) begin
-                        regs[REG_FLAGS] <= { ro_flags[15:3],
-                                             raw_op1>op2,
-                                             raw_op1==op2,
-                                             1'b1 };
-                    end else begin
-                        regs[REG_FLAGS] <= { ro_flags[15:3],
-                                             op1>op2,
-                                             op1==op2,
-                                             1'b1 };
-                    end
-                    core_state <= STEP;                                        
-                end
-                DO_CONST: begin
-                    regs[raw_op1] <= {regs[raw_op1][7:0],instr[7:0]};
-                    core_state <= STEP;
-                end
-                DO_ADD: begin
-                    if( opmode ) begin
-                        regs[raw_op2] = raw_op1+op2;
-                    end else begin
-                        regs[raw_op2] = op1+op2;
-                    end
-                    core_state <= STEP;
-                end
-                DO_AND: begin
-                    if( opmode ) begin
-                        regs[raw_op2] = raw_op1&op2;
-                    end else begin
-                        regs[raw_op2] = op1&op2;
-                    end
-                    core_state <= STEP;
-                end
-                DO_SHR: begin
-                    if( opmode ) begin
-                        regs[raw_op2] = op2>>raw_op1;
-                    end else begin
-                        regs[raw_op2] = op2>>op1;
-                    end
-                    core_state <= STEP;
-                end
-                DO_MOV: begin
-                    if( opmode ) begin
-                        regs[raw_op2] = raw_op1;
-                    end else begin
-                        regs[raw_op2] = op1;
-                    end
-                    core_state <= STEP;
-                end
-                DO_OUT: begin
-                    if( opmode ) begin
-                        out_char <= {4'b0,raw_op1};
-                    end else begin
-                        out_char <= op1[7:0];
-                    end
-                    write_x <= op2[15:8];
-                    write_y <= op2[7:0];
-                    out_char_strobe <= 1;
-                    core_state <= STEP;                                        
-                end
-                STEP: begin     // Only for instructions which step one forward!
-                    regs[REG_IP] <= regs[REG_IP]+1;
-                    core_state <= IFETCH_SETUP;
-                end
-            endcase
+                endcase
+            end
         end
     end
     
@@ -414,6 +417,10 @@ module flapjack_core(
                 65: begin char_x <= 5; char_y <= 15; char_chr <= regs[15][7:4]+48; char_str <= 1; end
                 66: begin char_x <= 6; char_y <= 15; char_chr <= regs[15][3:0]+48; char_str <= 1; end
     
+                67: begin char_x <= 3; char_y <= 16; char_chr <= instr[15:12]+48; char_str <= 1; end
+                68: begin char_x <= 4; char_y <= 16; char_chr <= instr[11:8]+48; char_str <= 1; end
+                69: begin char_x <= 5; char_y <= 16; char_chr <= instr[7:4]+48; char_str <= 1; end
+                70: begin char_x <= 6; char_y <= 16; char_chr <= instr[3:0]+48; char_str <= 1; end
     
                 default: begin end
             endcase
