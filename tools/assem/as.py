@@ -50,9 +50,9 @@ def strip_completely( line ):
 
 def get_regnum(rstr):
     if rstr=="ip":
-        return 7
+        return 15
     if rstr=="f":
-        return 6
+        return 14
     return int(rstr[1:])
 
 def get_smallvalue(vstr):
