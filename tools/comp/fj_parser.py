@@ -65,7 +65,7 @@ binary_op: "+"                                                                  
          | "<"                                                                              -> exp_binary_lt
 unary_prefix_op: "-"                                                                        -> op_unary_negate
 
-IDENTIFIER: CNAME                                                                           
+IDENTIFIER: CNAME
 
 %import common.CNAME
 %import common.INT
@@ -80,6 +80,9 @@ class CollectElements(Transformer):
 
     def stringlit_int16(self):
         return( "int16" )
+
+    def tokenstring(self,token):
+        return(token.value)
 
     def childobj( self, o ):
         return o
@@ -121,7 +124,7 @@ class CollectElements(Transformer):
         return ExpNode( op, [o1] )
 
     def exp_identifier( self, i ):
-        return ExpNode( ExpNode.IDEN, [i] )
+        return ExpNode( ExpNode.IDEN, [i.value] )
 
     def exp_literal( self, l ):
         return ExpNode( ExpNode.LIT, [l] )

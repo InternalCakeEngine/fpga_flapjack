@@ -23,25 +23,24 @@ def _layout_function( fd ):
     for param in fd.params:
         param.offset = initial_offset
         initial_offset += 1
-        print(f"Offset of param {param.name} is {param.offset}")
-    _do_layout( fd.code, initial_offset )
+    _do_layout( fd.code, fd.params, initial_offset )
 
-def _do_layout( cb, offset ):
+def _do_layout( cb, parentcb, offset ):
     cb.offset = offset
+    cb.parent = parentcb
     for line in cb.lines:
+        line.set_cb(cb)
         if isinstance(line,LocalVar):
             line.offset = offset
-            print(f"Initial offset of {line.name} is {line.offset}")
             offset += 1
         elif isinstance(line,CodeBlock):
-            _do_layout( line, offset )
+            _do_layout( line, cb, offset )
         elif isinstance(line,Assignment):
             pass
         elif isinstance(line,Return):
             pass
         else:
             print(f"Met unknown linetype in layout: {line}")
-            print(line.pretty())
             exit(1)
 
 
