@@ -1,6 +1,14 @@
 function addtwo( x -> int16, y -> int16 ) -> int16 {
         var z -> int16;
         let z=x+y;
+        {
+            var p -> int16;
+            var q -> int16;
+        }
+        {
+            var r -> int16;
+            var s -> int16;
+        }
         return z;
 }
 
