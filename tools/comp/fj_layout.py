@@ -23,7 +23,9 @@ def _layout_function( fd ):
     for param in fd.params:
         param.offset = initial_offset
         initial_offset += 1
+    fd.param_local_limit = initial_offset
     _do_layout( fd.code, fd.params, initial_offset )
+    fd.next_local = initial_offset
 
 def _do_layout( cb, parentcb, offset ):
     cb.offset = offset

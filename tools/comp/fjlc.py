@@ -18,7 +18,7 @@ def main():
     objform = fj_parser( inlines )
     fj_layout( objform )                    # Setup home locations for params and locals
     ir_list = fj_compile( objform )         # Compile to IR
-    ir_list = fj_regalloc( ir_list )        # Allocated register, inject spills and stack allocs.
+    fj_regalloc( ir_list )        # Allocated register, inject spills and stack allocs.
     out = fj_toasm( ir_list )               # Transform IR to assembly
 
 if __name__ == '__main__':

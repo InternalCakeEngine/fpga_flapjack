@@ -10,23 +10,23 @@
 from fj_ir_classes import *
 
 
-def fj_regalloc( ir_list ):
-    for func in ir_list:
-        print(f"Function: {func['name']}")
-        func["ir"] = _regalloc_func( func["ir"] )
-        for step in func["ir"]:
-            print(step["ir"].pretty(),step["livesa"])
+def fj_regalloc( func_list ):
+    for func in func_list:
+        func["ir"] = _regalloc_func( func )
 
-def _regalloc_func( irin ):
+def _regalloc_func( func ):
 
     # Expand the IR into a list of dicts we can add attributes to and
     # subsequently modify in place.
     steplist = []
-    for ir in irin:
+    for ir in func["ir"]:
         steplist.append( {"ir":ir} )
 
     _build_live_list( steplist )
     _reduce_to_2op( steplist )
+    spill_delta = _to_real_reg( steplist, func["next_local"] )
+    #spill_delta = 0
+    func["next_local"] += spill_delta
 
     return steplist
 
@@ -93,4 +93,45 @@ def _reduce_to_2op( steplist ):
 
         # This must always happen i.e. no continue-ing.
         step = nextstep
+
+
+# Replace SA references to real register number (ir changes from "sa" to "r".
+# It relies on the principle that once an SA is out of the liveset, it never returns.
+# There is knowlege of the target system embedded in here, which should really be externalised.
+def _to_real_reg( steplist, next_local_index ):
+
+    spill_delta = 0
+
+    regs = ["r1","r2","r3","r4","r5","r6","r7","r8","r9","r10","r11","r12"]
+
+    # Mapping from SA to reg and remaining free regs.
+    smap = {}
+    freeregs = regs.copy()
+
+    for step in steplist:
+        # First, unallocate any registers no longer needed.
+        newmap = {}
+        for sa in smap:
+            if sa in step["livesa"]:
+                newmap[sa] = smap[sa]
+            else:
+                freeregs = [smap[sa]]+freeregs
+                #freeregs.append(smap[sa])
+        smap = newmap
+        for item in step["ir"].srcs+[step["ir"].dst]:
+            if item.itype=="sa":
+                sa = item.iden
+                if sa not in smap:
+                    newreg = "ERROR"
+                    if regs!=[]:
+                        newreg = freeregs[0]
+                        freeregs = freeregs[1:]
+                    else:
+                        # Need to spill TBD
+                        newreg = "ERROR"
+                    smap[item.iden] = newreg
+                item.itype="r"
+                item.iden = smap[sa]
+
+    return spill_delta
 

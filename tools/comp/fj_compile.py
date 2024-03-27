@@ -21,7 +21,12 @@ def fj_compile( proot ):
     for entity in proot:
         if isinstance(entity,FunctionDef):
             compiled_code = _compile_func( entity )
-            ir_res.append( {"name":entity.name,"ir":compiled_code} )
+            ir_res.append( {
+                "name":entity.name,
+                "ir":compiled_code,
+                "first_local": entity.param_local_limit,
+                "next_local": entity.next_local
+            })
     return ir_res
 
 
