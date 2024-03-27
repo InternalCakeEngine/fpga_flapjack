@@ -127,7 +127,7 @@ class CollectElements(Transformer):
         return ExpNode( ExpNode.IDEN, [i.value] )
 
     def exp_literal( self, l ):
-        return ExpNode( ExpNode.LIT, [l] )
+        return ExpNode( ExpNode.LIT, [l.value] )
 
     def exp_binary_add(self):
         return ExpOp("+")

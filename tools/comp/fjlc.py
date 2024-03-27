@@ -16,10 +16,10 @@ def main():
     with open("test.oats","r") as infile:
         inlines = "\n".join(infile.readlines())
     objform = fj_parser( inlines )
-    fj_layout( objform )            # Setup home locations for params and locals
-    ir = fj_compile( objform )      # Compile to IR
-    ra = fj_regalloc( ir )          # Allocated register, inject spills and stack allocs.
-    out = fj_toasm( ra )            # Transform IR to assembly
+    fj_layout( objform )                    # Setup home locations for params and locals
+    ir_list = fj_compile( objform )         # Compile to IR
+    ir_list = fj_regalloc( ir_list )        # Allocated register, inject spills and stack allocs.
+    out = fj_toasm( ir_list )               # Transform IR to assembly
 
 if __name__ == '__main__':
     main()

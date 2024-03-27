@@ -7,21 +7,23 @@
 #
 
 # IR is in the form of tuples:
-#  (op,[srcs],[dsts])
+#  (op,[srcs],dsts)
 # ...where srcs and dsts are tuples of (<type>,<value>) where
 # type is "sa" for a single assignment location, "l" for a local,
 # "c" for a const.
 # 
 
 from fj_parsed_classes import *
+from fj_ir_classes import *
 
 def fj_compile( proot ):
+    ir_res = []
     for entity in proot:
         if isinstance(entity,FunctionDef):
             compiled_code = _compile_func( entity )
-            entity.compiled = compiled_code
-            for cl in compiled_code:
-                print(cl)
+            ir_res.append( {"name":entity.name,"ir":compiled_code} )
+    return ir_res
+
 
 def _compile_func( fd ):
     ssa_state = { "next":0 }
@@ -40,7 +42,7 @@ def _compile_block( cb, ssa_state ):
             dest_sa = get_next_sa(ssa_state)
             codeline.exp.dest_sa = dest_sa
             exp_code = compile_expression(cb,codeline.exp,ssa_state)
-            exp_code += [ ("store",[("sa",dest_sa)],[("l",assigned_var.offset)]) ]
+            exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",assigned_var.offset)) ]
             codeline.compiled = exp_code
         elif isinstance(codeline,Return):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
@@ -52,7 +54,7 @@ def _compile_block( cb, ssa_state ):
     
 
 def compile_return(sa):
-    return [ ("ret",[("sa",sa)],[]) ]
+    return [ IrStep("ret",[IrLoc("sa",sa)],IrLoc('nop',None)) ]
 
 def compile_expression(cb,exp,ssa_state):
     output = []
@@ -61,15 +63,15 @@ def compile_expression(cb,exp,ssa_state):
         if idenvar == None:
             print(f"Failed to find variable {exp.operands[0]}")
             exit(1)
-        output.append( ("load", [("l",idenvar.offset)], [("sa",exp.dest_sa)]) )
+        output.append( IrStep("load", [IrLoc("l",idenvar.offset)], IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.LIT:
-        output.append( ("const", [("c",exp.operands[0])],[("sa",exp.dest_sa)]) )
+        output.append( IrStep("const", [IrLoc("c",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
     else:
         for operand in exp.operands:
             operand.dest_sa = get_next_sa(ssa_state)
             operand.code = compile_expression(cb,operand,ssa_state)
         if exp.operator.op == "+":
-            nodecode = [ ( ("add"), [("sa",exp.operands[0].dest_sa),("sa",exp.operands[1].dest_sa)], [("sa",exp.dest_sa)] ) ]
+            nodecode = [ IrStep("add", [IrLoc("sa",exp.operands[0].dest_sa),IrLoc("sa",exp.operands[1].dest_sa)], IrLoc("sa",exp.dest_sa) ) ]
         else:
             print(f"Encountered unknown operator {exp.operator}")
             exit(1)
