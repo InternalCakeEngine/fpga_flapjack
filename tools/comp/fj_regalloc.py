@@ -118,6 +118,7 @@ def _to_real_reg( steplist, next_local_index ):
                 freeregs = [smap[sa]]+freeregs
                 #freeregs.append(smap[sa])
         smap = newmap
+        step["inuse"] = smap.values()
         for item in step["ir"].srcs+[step["ir"].dst]:
             if item and item.itype=="sa":
                 sa = item.iden

@@ -79,6 +79,7 @@ class Return(CodeLine):
 class ExpNode():
     IDEN = "iden"
     LIT = "lit"
+    CALL = "call"
     def __init__(self,operator,operands):
         self.operator = operator
         self.operands = operands

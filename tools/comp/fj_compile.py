@@ -105,7 +105,7 @@ def _compile_block( cb, ssa_state, label_state ):
     
 
 def compile_return(sa):
-    return [ IrStep("ret",[IrLoc("sa",sa)],IrLoc('nop',None)) ]
+    return [ IrStep("ret",[IrLoc("sa",sa)],None) ]
 
 def compile_expression(cb,exp,ssa_state,label_state):
     output = []
@@ -116,7 +116,15 @@ def compile_expression(cb,exp,ssa_state,label_state):
             exit(1)
         output.append( IrStep("load", [IrLoc("l",idenvar.offset)], IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.LIT:
-        output.append( IrStep("const", [IrLoc("c",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
+        output.append( IrStep("const", [IrLoc("lab",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
+    elif exp.operator == ExpNode.CALL:
+        print("Seen ExpNode.CALL")
+        plist = [ IrLoc("a",exp.operands[0]) ]
+        for param in exp.operands[1:]:
+            param.dest_sa = get_next_sa(ssa_state)
+            output += compile_expression(cb,param,ssa_state,label_state)
+            plist += IrLoc("sa",param.dest_sa)
+        output += [ IrStep("call", plist, IrLoc("sa",exp.dest_sa)) ]
     else:
         for operand in exp.operands:
             operand.dest_sa = get_next_sa(ssa_state)

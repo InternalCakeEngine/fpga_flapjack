@@ -38,6 +38,22 @@ def _toasm_func( funcname, funcir ):
                 lines.append(f"  st  {src.iden}, sp[{dst.iden}]")
             else:
                 lines.append(f"  BAD STORE: {stepir.pretty()}")
+        elif stepir.op == "call":
+            param_count = len(stepir.srcs[1:])
+            slist = list(step["inuse"])
+            for save in slist:
+                lines.append(f"  push {save}, sp")
+            for param in stepir.srcs[1:]:
+                lines.append(f"  push {param.iden}, sp")
+            lines.append(f"  const hi({stepir.srcs[0].iden}), r0")
+            lines.append(f"  const lo({stepir.srcs[0].iden}), r0")
+            lines.append(f"  call r0")
+            if param_count > 0:
+                lines.append(f"  add {param_count}, sp")
+            slist.reverse()
+            for save in slist:
+                lines.append(f"  pop sp, {save}")
+            lines.append(f"  mov r0, {stepir.dst.iden}")
         elif stepir.op == "add":
             src = stepir.srcs[0]
             dst = stepir.dst
@@ -55,12 +71,18 @@ def _toasm_func( funcname, funcir ):
         elif stepir.op == "const":
             src = stepir.srcs[0]
             dst = stepir.dst
-            v = int(src.iden)
-            if (v>=0) and (v<16):
-                lines.append(f"  mov {v}, {dst.iden}")
+            if src.itype=="c":
+                v = int(src.iden)
+                if (v>=0) and (v<16):
+                    lines.append(f"  mov {v}, {dst.iden}")
+                else:
+                    lines.append(f"  const hi({v}), {dst.iden}")
+                    lines.append(f"  const lo({v}), {dst.iden}")
+            elif src.itype=="lab":
+                lines.append(f"  const hi({src.iden}), {dst.iden}")
+                lines.append(f"  const lo({src.iden}), {dst.iden}")
             else:
-                lines.append(f"  const {v%256}, {dst.iden}")
-                lines.append(f"  const {v&256}, {dst.iden}")
+                lines.append(f"  BAD CONSTANT: {stepir.pretty()}")
         elif stepir.op == "label":
             lines.append(f"{stepir.srcs[0].iden}:")
         elif stepir.op == "cmp":

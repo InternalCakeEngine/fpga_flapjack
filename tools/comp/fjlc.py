@@ -15,7 +15,12 @@ from fj_toasm import fj_toasm
 def main():
     with open("test.oats","r") as infile:
         inlines = "\n".join(infile.readlines())
-    objform = fj_parser( inlines )
+    try:
+        objform = fj_parser( inlines )
+    except Exception as e:
+        print("Exception parsing input.")
+        print(e)
+        exit(1)
     fj_layout( objform )                    # Setup home locations for params and locals
     ir_list = fj_compile( objform )         # Compile to IR
     fj_regalloc( ir_list )        # Allocated register, inject spills and stack allocs.

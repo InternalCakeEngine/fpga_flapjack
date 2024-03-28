@@ -18,12 +18,14 @@ _flapjack_grammar = '''
 start: entity_list                                                                          -> childobj
 
 entity_list: function_def                                                                   -> childobj_list
-           | ( function_def entity_list )                                                   -> choldobjpair_list
+           | ( function_def entity_list )                                                   -> childobjpair_list
 
-function_def: "function" IDENTIFIER "(" formal_param_list ")" "->" type_name code_block     -> function_def
+function_def: "function" IDENTIFIER "(" formal_params_or_not ")" "->" type_name code_block  -> function_def
 
-formal_param_list: formal_param_single                                                      -> childobj_list
-                 | ( formal_param_single "," formal_param_list )                            -> childobjpair_list
+formal_params_or_not: "empty"                                                               -> empty_list
+                    | formal_params                                                         -> childobj
+formal_params: formal_param_single                                                          -> childobj_list
+                 | ( formal_param_single "," formal_params )                                -> childobjpair_list
 formal_param_single: IDENTIFIER "->" type_name                                              -> var_declaration
 
 type_name: builtin_typename                                                                 -> childobj
@@ -51,8 +53,17 @@ return_line: "return" expression ";"                                            
 expression: (   "(" expression ")" )                                                        -> exp_paren
           | binary_op_form                                                                  -> childobj
           | unary_prefix_op_form                                                            -> childobj
+          | function_call                                                                   -> childobj
           | IDENTIFIER                                                                      -> exp_identifier
           | INT                                                                             -> exp_literal
+
+function_call: IDENTIFIER "(" call_params_or_not ")"                                        -> exp_call
+
+call_params_or_not: "empty"                                                                 -> empty_list
+                  | call_params                                                             -> childobj
+call_params: call_param_single                                                              -> childobj_list
+                 | ( call_param_single "," call_params )                                    -> childobjpair_list
+call_param_single: expression                                                               -> childobj
 
 binary_op_form: expression binary_op expression                                             -> exp_binary
 unary_prefix_op_form: unary_prefix_op expression                                            -> exp_unary
@@ -90,6 +101,9 @@ class CollectElements(Transformer):
 
     def childobj( self, o ):
         return o
+
+    def empty_list( self ):
+        return []
 
     def childobj_list( self, o ):
         return [o]
@@ -130,6 +144,10 @@ class CollectElements(Transformer):
     def exp_paren( self, expression ):
         return expression
 
+    def exp_call( self, name, params ):
+        print("Seen call")
+        return ExpNode( ExpNode.CALL, [name]+params )
+
     def exp_binary( self, o1, op, o2 ):
         return ExpNode( op, [o1,o2] )
 
@@ -165,6 +183,12 @@ class CollectElements(Transformer):
     def exp_unary_negate(self):
         return ExpOp("-")
 
-_fj_generated = Lark( _flapjack_grammar, parser="lalr", transformer=CollectElements() )
-fj_parser = _fj_generated.parse
+try:
+    _fj_generated = Lark( _flapjack_grammar, parser="lalr", transformer=CollectElements() )
+    fj_parser = _fj_generated.parse
+except Exception as e:
+    print("Exception building parser.")
+    print(e)
+    
+
 

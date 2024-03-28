@@ -10,9 +10,13 @@ function addtwo( x -> int16, y -> int16 ) -> int16 {
             let a = a+2;
         }
         if( b == 2 ) {
-            let a = a+3;
+            let a = a+getnum(empty);
         }
     }
     return a;
+}
+
+function getnum(empty) -> int16 {
+    return 20;
 }
 
