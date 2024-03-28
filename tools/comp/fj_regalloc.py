@@ -41,7 +41,7 @@ def _build_live_list( steplist ):
 
     for index, step in enumerate(steplist):
         dst = step["ir"].dst
-        if dst.itype == "sa":
+        if dst and dst.itype == "sa":
             livelist.add(dst.iden)
         step["livesa"] = livelist.copy()
         for src in step["ir"].srcs:
@@ -50,7 +50,7 @@ def _build_live_list( steplist ):
 
     for index, step in enumerate(steplist):
         dst = step["ir"].dst
-        if dst.itype == "sa":
+        if dst and dst.itype == "sa":
             if index >= lastreads[dst.iden]:
                 dst.itype = 'nop'
                 dst.iden = None
@@ -75,7 +75,7 @@ def _reduce_to_2op( steplist ):
             continue
         # Do the renumber first.
         dst = step["ir"].dst
-        if dst.itype == "sa":
+        if dst and dst.itype == "sa":
             dst.iden = renumbernotes.get(dst.iden,dst.iden)
         for src in step["ir"].srcs:
             if src.itype == "sa":
@@ -119,7 +119,7 @@ def _to_real_reg( steplist, next_local_index ):
                 #freeregs.append(smap[sa])
         smap = newmap
         for item in step["ir"].srcs+[step["ir"].dst]:
-            if item.itype=="sa":
+            if item and item.itype=="sa":
                 sa = item.iden
                 if sa not in smap:
                     newreg = "ERROR"

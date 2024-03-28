@@ -57,6 +57,12 @@ class Assignment(CodeLine):
         self.name = name
         self.exp = exp
 
+# A while loop.
+class WhileLoop(CodeLine):
+    def __init__(self,exp,code_block):
+        self.exp = exp
+        self.code_block = code_block 
+
 # A return statement.
 class Return(CodeLine):
     def __init__(self,exp):

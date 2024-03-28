@@ -1,10 +1,11 @@
 function addtwo( x -> int16, y -> int16 ) -> int16 {
-        var z -> int16;
         var a -> int16;
         var b -> int16;
-        let a=x+y;
-        let b=2;
-        let z=a+b;
-        return z;
+        let a=0;
+        let b=10;
+        while( b>0 ) {
+            let a = a+1;
+        }
+        return a;
 }
 

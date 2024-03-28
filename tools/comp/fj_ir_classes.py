@@ -20,4 +20,4 @@ class IrStep():
         self.dst = dst
 
     def pretty(self):
-        return f"{self.op}("+(",".join([src.pretty() for src in self.srcs]))+")->"+self.dst.pretty()
+        return f"{self.op}("+(",".join([src.pretty() for src in self.srcs]))+")->"+(self.dst.pretty() if self.dst else "<nodst>")

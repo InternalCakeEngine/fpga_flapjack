@@ -39,6 +39,8 @@ def _do_layout( cb, parentcb, offset ):
             _do_layout( line, cb, offset )
         elif isinstance(line,Assignment):
             pass
+        elif isinstance(line,WhileLoop):
+            _do_layout( line.code_block, cb, offset )
         elif isinstance(line,Return):
             pass
         else:
