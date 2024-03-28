@@ -41,6 +41,10 @@ def _do_layout( cb, parentcb, offset ):
             pass
         elif isinstance(line,WhileLoop):
             _do_layout( line.code_block, cb, offset )
+        elif isinstance(line,IfElse):
+            _do_layout( line.code_block_if, cb, offset )
+            if line.code_block_else:
+                _do_layout( line.code_block_else, cb, offset )
         elif isinstance(line,Return):
             pass
         else:

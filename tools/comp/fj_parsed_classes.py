@@ -63,6 +63,13 @@ class WhileLoop(CodeLine):
         self.exp = exp
         self.code_block = code_block 
 
+# A while loop.
+class IfElse(CodeLine):
+    def __init__(self,exp,code_block_if,code_block_else):
+        self.exp = exp
+        self.code_block_if = code_block_if
+        self.code_block_else = code_block_else
+
 # A return statement.
 class Return(CodeLine):
     def __init__(self,exp):

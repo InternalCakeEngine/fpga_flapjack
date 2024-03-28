@@ -75,6 +75,30 @@ def _compile_block( cb, ssa_state, label_state ):
                 IrStep("label",[end_label],None)
                 # Stack retraction goes in here.
             ]
+        elif isinstance(codeline,IfElse):
+            codeline.exp.dest_sa = get_next_sa(ssa_state)
+            exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
+            body_code_if   = _compile_block( codeline.code_block_if,   ssa_state, label_state )
+            body_code_else = None
+            if codeline.code_block_else:
+                body_code_else = _compile_block( codeline.code_block_else, ssa_state, label_state )
+            else_label = get_next_label(label_state)
+            end_label = get_next_label(label_state)
+            codeline.compiled  = exp_code
+            codeline.compiled += [
+                IrStep("cmp", [IrLoc("c",0),IrLoc("sa",codeline.exp.dest_sa)], None),
+                IrStep("branch_cond", [else_label,IrLoc("cc","eq")], None)
+            ]
+            codeline.compiled += body_code_if
+            if body_code_else:
+                codeline.compiled += [
+                    IrStep("branch_cond", [end_label,IrLoc("cc","a")], None),
+                    IrStep("label",[else_label],None)
+                ]
+                codeline.compiled += body_code_else
+            else:
+                codeline.compiled += [ IrStep("label",[else_label],None) ]
+            codeline.compiled += [ IrStep("label",[end_label],None) ]
         if codeline.compiled:
             res += codeline.compiled
     return res
@@ -106,6 +130,21 @@ def compile_expression(cb,exp,ssa_state,label_state):
                 IrStep("cmp", [IrLoc("sa",exp.operands[0].dest_sa),IrLoc("sa",exp.operands[1].dest_sa)], None ),
                 IrStep("branch_cond", [hop_label,IrLoc("cc","gt")],None),
                 IrStep("load", [IrLoc("c",0)], IrLoc("sa",exp.dest_sa)),
+                IrStep("label",[hop_label],None)
+            ]
+        elif exp.operator.op=="!=" or exp.operator.op=="==":
+            hop_label = get_next_label(label_state)
+            if exp.operator.op == "!=":
+                v1 = 1
+                v2 = 0
+            else:
+                v1 = 0
+                v2 = 1
+            nodecode = [
+                IrStep("load", [IrLoc("c",v1)], IrLoc("sa",exp.dest_sa)),
+                IrStep("cmp", [IrLoc("sa",exp.operands[0].dest_sa),IrLoc("sa",exp.operands[1].dest_sa)], None ),
+                IrStep("branch_cond", [hop_label,IrLoc("cc","eq")],None),
+                IrStep("load", [IrLoc("c",v2)], IrLoc("sa",exp.dest_sa)),
                 IrStep("label",[hop_label],None)
             ]
         else:

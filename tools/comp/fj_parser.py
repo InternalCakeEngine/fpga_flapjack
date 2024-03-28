@@ -36,13 +36,15 @@ code_line_list: code_line                                                       
               | ( code_line code_line_list )                                                -> childobjpair_list
 
 code_line: code_block                                                                       -> childobj
-         | ( ( var_decl_line | assignment_line | while_line | return_line ) )               -> childobj
+         | ( ( var_decl_line | assignment_line | while_line | if_line | return_line ) )     -> childobj
 
 var_decl_line: "var" IDENTIFIER "->" type_name ";"                                          -> var_declaration
 
 assignment_line: "let" IDENTIFIER "=" expression ";"                                        -> assignment
 
 while_line: "while" "(" expression ")" code_block                                           -> while_loop
+if_line: ( "if"    "(" expression ")" code_block "else" code_block )                        -> ifelse
+       | ( "if"    "(" expression ")" code_block  )                                         -> ifonly
 
 return_line: "return" expression ";"                                                        -> func_return
 
@@ -106,6 +108,12 @@ class CollectElements(Transformer):
 
     def while_loop( self, exp, code_block ):
         return WhileLoop( exp, code_block )
+
+    def ifelse( self, exp, code_block_if, code_block_else ):
+        return IfElse( exp, code_block_if, code_block_else )
+
+    def ifonly( self, exp, code_block_if ):
+        return IfElse( exp, code_block_if, None )
 
     def formal_param( self, vtype, name ):
         return LocalVar( name, vtype )

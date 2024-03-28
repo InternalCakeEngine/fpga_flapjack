@@ -1,11 +1,18 @@
 function addtwo( x -> int16, y -> int16 ) -> int16 {
-        var a -> int16;
-        var b -> int16;
-        let a=0;
-        let b=10;
-        while( b>0 ) {
+    var a -> int16;
+    var b -> int16;
+    let a=0;
+    let b=10;
+    while( b>0 ) {
+        if( b != 5 ) {
             let a = a+1;
+        } else {
+            let a = a+2;
         }
-        return a;
+        if( b == 2 ) {
+            let a = a+3;
+        }
+    }
+    return a;
 }
 
