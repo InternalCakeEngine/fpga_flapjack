@@ -49,17 +49,27 @@ def strip_completely( line ):
 
 
 def get_regnum(rstr):
-    if rstr=="ip":
+    if rstr[:2]=="ip":
         return 15
-    if rstr=="f":
+    elif rstr[:2]=="sp":
         return 14
-    return int(rstr[1:])
+    elif rstr[:2]=="fl":
+        return 13
+    elif rstr[:2]=="ct":
+        return 12
+    endloc = rstr.index('[') if '[' in rstr else None
+    return int(rstr[1:endloc])
+
+def get_subindex(rstr):
+    if '[' in rstr:
+        return int(rstr[rstr.index('[')+1:-1])
+    return 0
 
 def get_smallvalue(vstr):
     return int(vstr,0)%0x10
 
 def get_opmode(rstr):
-    if rstr[0]=='r':
+    if rstr[0]=='r' or rstr[:2] in ["ip","fl","sp","ct"]:
         return 0
     else:
         return 1
@@ -100,7 +110,7 @@ fmt1 = {
 
 fmt2 = {
     "ld":3,
-    "st":3,
+    "st":4,
     "add":5,
     "sub":6,
     "cmp":7,
@@ -112,6 +122,14 @@ fmt2 = {
 
 fmt3 = {
     "const": 9,
+}
+
+# All the main opcodes are zero. Subcode are given here.
+fmt4 = {
+    "nop": 0,
+    "call": 1,
+    "saveh": 2,
+    "ret": 3
 }
 
 def do_assembly( filename, lines ):
@@ -172,23 +190,44 @@ def do_assembly( filename, lines ):
                 oc = fmt1[instr[0]]
                 val = (oc<<12) | (r1<<8) | (r2<<4) | cc
             elif instr[0] in fmt2:
+                i=0
                 a = get_opmode(ops[0])
                 if a==1:
                     r1 = get_smallvalue(ops[0])
                 else:
                     r1 = get_regnum(ops[0])
                 r2 = get_regnum(ops[1])
+                if instr[0] == "st":
+                    i = get_subindex(ops[1])
+                elif instr[0] == "ld":
+                    i = get_subindex(ops[0])
                 oc = fmt2[instr[0]]
-                val = (oc<<12) | (r1<<8) | (r2<<4) | (a<<3)
+                val = (oc<<12) | (r1<<8) | (r2<<4) | (a<<3) | (i&7)
             elif instr[0] in fmt3:
-                r = get_regnum(ops[0])
+                r = get_regnum(ops[1])
                 c = 0
+                cshift = 0
+                if ops[0][0:3]=="hi(":
+                    opstr = ops[0][3:-1]
+                    cshift = 8
+                elif ops[0][0:3]=="lo(":
+                    opstr = ops[0][3:-1]
+                else:
+                    opstr = ops[0]
                 try:
-                    c = int(ops[1],0) % 256
+                    c = ( int(opstr,0)>>cshift ) % 256
                 except:
-                    relocs.append((target_address,"lowbyte",ops[1]))
+                    if cshift==8:
+                        relocs.append((target_address,"highbyte",ops[0]))
+                    else:
+                        relocs.append((target_address,"lowbyte",ops[0]))
                 oc = fmt3[instr[0]]
                 val = (oc<<12) | (r<<8) | c
+            elif instr[0] in fmt4:
+                opcode = 0
+                subcode = fmt4[instr[0]]
+                c = int(ops[0],0)&255
+                val = (opcode<<12) | (subcode<<8) | c
             else:
                 print(f"Unknown opcode '{instr[0]}'. Skipping output for '{filename}'.")
                 return None
@@ -206,7 +245,7 @@ def do_assembly( filename, lines ):
             outvals[tgt] = val
         elif mode=="lowbyte":
             outvals[tgt] = (outvals[tgt]&0xff00)|(val&0xff)
-        elif mode=="hibyte":
+        elif mode=="highbyte":
             outvals[tgt] = (outvals[tgt]&0xff00)|((val>>8)&0xff)
         else:
             print(f"Failed to apply reloc '{mode}' using '{valt}'. Skipping output for '{filename}'")

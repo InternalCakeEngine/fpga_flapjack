@@ -1,14 +1,15 @@
 Registers (all 16bit)
-#	Name	Purpose
-0	r0	General
-1	r1	General
-2	r2	General
-3	r3	General
-4	r4	General
+#   Name    Purpose
+0   r0  General
+1   r1  General
+2   r2  General
+3   r3  General
+4   r4  General
 ...
-13	fl	Flags
-14	sp	Stack pointer
-15	ip	Instruction pointer
+12  ct  Call/return target
+13  fl  Flags
+14  sp  Stack pointer
+15  ip  Instruction pointer
 
 
 Instruction format (all 16 bit)
@@ -16,27 +17,34 @@ Instruction format (all 16 bit)
 Format 1: jp, br
 15             0
 |              |
-oooo------------	Opcode		(0..15)
-----xxxx--------	Operand 1	(r0..r15]
---------yyyy----	Operand 2	(r0..r5]
-------------sfff	Condition/md
+oooo------------    Opcode      (0..15)
+----xxxx--------    Operand 1   (r0..r15]
+--------yyyy----    Operand 2   (r0..r5]
+------------sfff    Condition/md
 
 
 Format 2: ld, st, add, sub, cmp, out, and, mov, shr
 15             0
 |              |
-oooo------------	Opcode		(0..15)
-----xxxx--------	Operand 1	(r0..r15]
---------yyyy----	Operand 2	(r0..r5]
-------------a---	Op-modes for op1 (0=reg, 1=const)
-
+oooo------------    Opcode      (0..15)
+----xxxx--------    Operand 1   (r0..r15]
+--------yyyy----    Operand 2   (r0..r5]
+------------a---    Op-modes for op1 (0=reg, 1=const)
 
 Format 3: const
 15             0
 |              |
-oooo------------	Opcode		(0..15)
-----xxxx--------	Operand 1	(r0..r15]
---------cccccccc	Constant	(0..255)
+oooo------------    Opcode      (0..15)
+----xxxx--------    Operand 1   (r0..r15]
+--------cccccccc    Constant    (0..255)
+
+Format 4: Specials
+15             0
+|              |
+0000------------    Opcode is always 0
+----xxxx--------    Extended code: 0=NOP, 1=CALL, 2=SAVEHIGH, 3=RET
+--------cccccccc    Constant (regnum and regs to save for CALL, stack
+                    contraction for RET)
 
 
 Memory is 65536 x 16bit words
@@ -44,12 +52,12 @@ SP is full-decending.
 IP points to the currently executing instruction + 1.
 
 Flags:
-bit#	Meaning
-0	Always true	(instr condition)
-1	Equal		(instr condition)
-2	Greater than	(instr condition)
-3	Spare		(instr condition)
-4	Overflow
+bit#    Meaning
+0   Always true     (instr condition)
+1   Equal           (instr condition)
+2   Greater than    (instr condition)
+3   Spare           (instr condition)
+4   Overflow?
 ..15
 
 Flag conditions
@@ -57,19 +65,20 @@ sffff
 result = ( s ? r5&ffff : ~r5&ffff ) != 0
 
 Opcodes:
-#	Name	Function	Action
-00	nop	Nothing		Nothing
-01	jp	Jump		Jump to O1 if flag conditions are true else to O2
-02	br	Branch		Jump to ip+O1 if flag conditions are true else to ip+O2
-03	ld	Load		Read from memory address O1 into O2
-04	st	Store		Write O1 into memory address O2
-05	add	Add		Add O1 to O2
-06	sub	Sub		Sub O1 from O2
-07	cmp	Compare		Compare O1 to O2
-08	out	Write to IO	Write O1 into IO address O2
-09	const	Load 8bits	Write to O1 0x00nnn
-10	and	Bitwise and	And o1 and o2 -> o2
-11	mov	Reg-reg move	Copy o1 into o2
-12	shr	Shift right	Shift o2 right by o1 bits
-..31
+#   Name    Function        Action
+00  ext     psueo op        Special case for NOP, CALL, RET, etc
+01  jp      Jump            Jump to O1 if flag conditions are true else to O2
+02  br      Branch          Jump to ip+O1 if flag conditions are true else to ip+O2
+03  ld      Load            Read from memory address O1 into O2
+04  st      Store           Write O1 into memory address O2
+05  add     Add             Add O1 to O2
+06  sub     Sub             Sub O1 from O2
+07  cmp     Compare         Compare O1 to O2
+08  out     Write to IO     Write O1 into IO address O2
+09  const   Load 8bits      Write to O1 0x00nnn
+10  and     Bitwise and     And o1 and o2 -> o2
+11  mov     Reg-reg move    Copy o1 into o2
+12  shr     Shift right     Shift o2 right by o1 bits
+
+..15
 

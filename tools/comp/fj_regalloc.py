@@ -24,9 +24,9 @@ def _regalloc_func( func ):
 
     _build_live_list( steplist )
     _reduce_to_2op( steplist )
-    spill_delta = _to_real_reg( steplist, func["next_local"] )
-    #spill_delta = 0
-    func["next_local"] += spill_delta
+    spill_delta = _to_real_reg( steplist, 0 )
+    # TODO
+    # func["next_local"] += spill_delta
 
     return steplist
 
@@ -116,7 +116,6 @@ def _to_real_reg( steplist, next_local_index ):
                 newmap[sa] = smap[sa]
             else:
                 freeregs = [smap[sa]]+freeregs
-                #freeregs.append(smap[sa])
         smap = newmap
         step["inuse"] = smap.values()
         for item in step["ir"].srcs+[step["ir"].dst]:

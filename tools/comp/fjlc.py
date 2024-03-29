@@ -6,6 +6,8 @@
 # Front end and driver for the compiler.
 #
 
+import sys
+
 from fj_parser import fj_parser
 from fj_layout import fj_layout
 from fj_compile import fj_compile
@@ -13,7 +15,7 @@ from fj_regalloc import fj_regalloc
 from fj_toasm import fj_toasm
 
 def main():
-    with open("test.oats","r") as infile:
+    with open(sys.argv[1],"r") as infile:
         inlines = "\n".join(infile.readlines())
     try:
         objform = fj_parser( inlines )

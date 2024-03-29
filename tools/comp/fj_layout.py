@@ -19,17 +19,18 @@ def fj_layout( proot ):
 
 
 def _layout_function( fd ):
-    initial_offset = 0
+    initial_offset = 0  # For saving the CT; size is offset+1.
     for param in fd.params:
         param.offset = initial_offset
         initial_offset += 1
     fd.param_local_limit = initial_offset
-    _do_layout( fd.code, fd.params, initial_offset )
-    fd.next_local = initial_offset
+    full_offset = _do_layout( fd.code, fd.params, initial_offset )
+    fd.stackextent = full_offset
 
 def _do_layout( cb, parentcb, offset ):
     cb.offset = offset
     cb.parent = parentcb
+    max_offset = offset
     for line in cb.lines:
         line.set_cb(cb)
         if isinstance(line,LocalVar):
@@ -50,6 +51,7 @@ def _do_layout( cb, parentcb, offset ):
         else:
             print(f"Met unknown linetype in layout: {line}")
             exit(1)
+    return offset   # Initial offset, not max offset!
 
 
 

@@ -173,6 +173,8 @@ module flapjack_core(
                         raw_op2 <= mem_word_read[7:4];
                         op2 <= regs[mem_word_read[7:4]];
                         raw_opcode <= mem_word_read[15:12];
+                        opmode <= raw_cond[3];
+                        opindex <= raw_cond[2:0];
                         raw_cond <= mem_word_read[3:0];
                         core_state <= DECODE;
                     end
@@ -190,39 +192,30 @@ module flapjack_core(
                                 core_state <= STEP;
                             end
                             OP_LD: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_LD_1;
                             end
                             OP_ST: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_ST;
                             end
                             OP_ADD: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_ADD;
                             end
                             OP_SUB: begin
-                                opmode <= raw_cond[3];
                                 core_state <= STEP;
                             end
                             OP_AND: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_AND;
                             end
                             OP_SHR: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_SHR;
                             end
                             OP_MOV: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_MOV;
                             end
                             OP_CMP: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_CMP;
                             end
                             OP_OUT: begin
-                                opmode <= raw_cond[3];
                                 core_state <= DO_OUT;
                             end
                             OP_CONST: begin
@@ -244,7 +237,7 @@ module flapjack_core(
                             regs[raw_op2] <= raw_op1;
                             core_state <= STEP;
                         end else begin
-                            mem_addr_read <= op1;
+                            mem_addr_read <= op1+opindex;
                             core_state <= DO_LD_2;
                             mem_read_strobe <= 1;
                         end
@@ -259,7 +252,7 @@ module flapjack_core(
                         end else begin
                             mem_word_write <= op1;
                         end
-                        mem_addr_write <= op2;
+                        mem_addr_write <= op2+opindex;
                         mem_strobe <= 1;
                         core_state <= STEP;
                     end

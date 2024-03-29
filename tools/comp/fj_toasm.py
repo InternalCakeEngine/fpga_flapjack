@@ -8,16 +8,18 @@
 
 def fj_toasm( func_list ):
     for func in func_list:
-        func["asm"] = _toasm_func( func["name"], func["ir"] )
+        func["asm"] = _toasm_func( func["name"], func["ir"], func["stackextent"] )
         for instr in func["asm"]:
             print(instr)
     
     return []
 
-def _toasm_func( funcname, funcir ):
+def _toasm_func( funcname, funcir, initial_stack_extent ):
 
     lines = [
-        f"{funcname}:"
+        f"{funcname}:",
+        f"  sub {initial_stack_extent}, sp",
+        f"  st  ct, sp[{initial_stack_extent}]" # Only necessary for non-leaf functions.
     ]
     
     for step in funcir:
@@ -65,7 +67,8 @@ def _toasm_func( funcname, funcir ):
             src = stepir.srcs[0]
             if src.itype=="r":
                 lines.append(f"  mov  {src.iden}, r0")
-                lines.append(f"  ret")
+                lines.append(f"  ld  sp[{initial_stack_extent}], ct")
+                lines.append(f"  ret {stepir.srcs[1].iden}")
             else:
                 lines.append(f"  BAD RET: {stepir.pretty()}")
         elif stepir.op == "const":

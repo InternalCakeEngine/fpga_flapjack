@@ -21,12 +21,12 @@ def fj_compile( proot ):
     ir_res = []
     for entity in proot:
         if isinstance(entity,FunctionDef):
+            entity.code.stackextent = entity.stackextent
             compiled_code = _compile_func( entity, label_state )
             ir_res.append( {
                 "name":entity.name,
                 "ir":compiled_code,
-                "first_local": entity.param_local_limit,
-                "next_local": entity.next_local
+                "stackextent": entity.stackextent
             })
     return ir_res
 
@@ -53,10 +53,11 @@ def _compile_block( cb, ssa_state, label_state ):
         elif isinstance(codeline,Return):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
-            codeline.compiled = exp_code+compile_return(codeline.exp.dest_sa)
+            codeline.compiled = exp_code+compile_return(codeline.exp.dest_sa,cb.stackextent)
         elif isinstance(codeline,WhileLoop):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
+            codeline.code_block.stackextent = cb.stackextent
             body_code = _compile_block(codeline.code_block,ssa_state,label_state)
             top_label = get_next_label(label_state)
             end_label = get_next_label(label_state)
@@ -78,9 +79,11 @@ def _compile_block( cb, ssa_state, label_state ):
         elif isinstance(codeline,IfElse):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
+            codeline.code_block.stackextent = cb.stackextent
             body_code_if   = _compile_block( codeline.code_block_if,   ssa_state, label_state )
             body_code_else = None
             if codeline.code_block_else:
+                codeline.code_block.stackextent = cb.stackextent
                 body_code_else = _compile_block( codeline.code_block_else, ssa_state, label_state )
             else_label = get_next_label(label_state)
             end_label = get_next_label(label_state)
@@ -104,8 +107,8 @@ def _compile_block( cb, ssa_state, label_state ):
     return res
     
 
-def compile_return(sa):
-    return [ IrStep("ret",[IrLoc("sa",sa)],None) ]
+def compile_return(sa,spdelta):
+    return [ IrStep("ret",[IrLoc("sa",sa),IrLoc("c",spdelta)],None) ]
 
 def compile_expression(cb,exp,ssa_state,label_state):
     output = []
