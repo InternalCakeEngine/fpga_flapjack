@@ -43,6 +43,8 @@ def work():
         op1_raw = (instr>>8)&15
         op2_raw = (instr>>4)&15
         op1_mode = (instr>>3)&1
+        deltamode = (instr>>1)&3
+        deltaval = {0:0,1:1,2:-1,3:0}[deltamode]
         opindex = instr&7
         op1 = regs[op1_raw]&65535
         op2 = regs[op2_raw]&65535
@@ -76,12 +78,19 @@ def work():
         elif opcode==1:     #  jp      Jump            Jump to O1 if flag conditions are true else to O2
             regs[IP] = op1 if condtrue else op2
             inhibit_step = True
-        elif opcode==2:     #  br      Branch          Jump to ip+O1 if flag conditions are true else to ip+O2
+        elif opcode==2:     #  br      Branch          Jump to ip+const (const is bits 7..0 sign extended.
+            c = ((instr>>4)&255)
+            if c<128:
+                regs[IP] = (regs[IP]+c)&65535
+            else:
+                regs[IP] = (regs[IP]-(256-c))&65535
             pass
         elif opcode==3:     #  ld      Load            Read from memory address O1 into O2
             regs[op2_raw] = op1_raw if op1_mode else mem[(op1+opindex)&65535]
+            regs[op1_raw] += deltaval
         elif opcode==4:     #  st      Store           Write O1 into memory address O2
             mem[(op2+opindex)&65535] =  op1_raw if op1_mode else op1
+            regs[op2_raw] += deltaval
         elif opcode==5:     #  add     Add             Add O1 to O2
             regs[op2_raw] = (regs[op2_raw] + ( op1_raw if op1_mode else op1 ))&65535
         elif opcode==6:     #  sub     Sub             Sub O1 from O2
@@ -93,8 +102,17 @@ def work():
             print(f"Output {op1,op2}")
         elif opcode==9:     #  const   Load 8bits      Write to O1 0x00nnn
             regs[op1_raw] = ((op1<<8)|(instr&255))&65535
-        elif opcode==10:    #  and     Bitwise and     And o1 and o2 -> o2
-            regs[op2_raw] &= op1_raw if op1_mode else op1
+        elif opcode==10:    #  bits    logic ops
+            if instr&7 == 0:
+                regs[op2_raw] <<= op1_raw if op1_mode else op1
+            elif instr&7 == 1:
+                regs[op2_raw] >>= op1_raw if op1_mode else op1
+            elif instr&7 == 2:
+                regs[op2_raw] &= op1_raw if op1_mode else op1
+            elif instr&7 == 3:
+                regs[op2_raw] |= op1_raw if op1_mode else op1
+            elif instr&7 == 4:
+                regs[op2_raw] ^= op1_raw if op1_mode else op1
         elif opcode==11:    #  mov     Reg-reg move    Copy o1 into o2
             regs[op2_raw] = op1_raw if op1_mode else op1
         elif opcode==12:    #  shr     Shift right     Shift o2 right by o1 bits

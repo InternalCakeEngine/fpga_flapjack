@@ -49,6 +49,7 @@ def strip_completely( line ):
 
 
 def get_regnum(rstr):
+    rstr = rstr[:-1] if rstr[-1] in ["+","-"] else rstr
     if rstr[:2]=="ip":
         return 15
     elif rstr[:2]=="sp":
@@ -105,7 +106,6 @@ def get_cond(cstr):
 
 fmt1 = {
     "jp":1,
-    "br":2,
 }
 
 fmt2 = {
@@ -116,8 +116,11 @@ fmt2 = {
     "cmp":7,
     "out":8,
     "and":10,
+    "or":10,
+    "xor":10,
+    "shr":10,
+    "shl":10,
     "mov":11,
-    "shr":12,
 }
 
 fmt3 = {
@@ -130,6 +133,10 @@ fmt4 = {
     "call": 1,
     "saveh": 2,
     "ret": 3
+}
+
+fmt5 = {
+    "br":2,
 }
 
 def do_assembly( filename, lines ):
@@ -201,6 +208,8 @@ def do_assembly( filename, lines ):
                     i = get_subindex(ops[1])
                 elif instr[0] == "ld":
                     i = get_subindex(ops[0])
+                elif instr[0] in ["and","or","xor","shl","shr"]:
+                    i = {"and":0,"or":1,"xor":2,"shl":3,"shr":4}[instr[0]]
                 oc = fmt2[instr[0]]
                 val = (oc<<12) | (r1<<8) | (r2<<4) | (a<<3) | (i&7)
             elif instr[0] in fmt3:
@@ -226,8 +235,28 @@ def do_assembly( filename, lines ):
             elif instr[0] in fmt4:
                 opcode = 0
                 subcode = fmt4[instr[0]]
-                c = int(ops[0],0)&255
+                if instr[0] == "call":
+                    c = get_regnum(ops[0])<<4
+                elif instr[0] == "nop":
+                    c=0
+                else:
+                    c = int(ops[0],0)&255
                 val = (opcode<<12) | (subcode<<8) | c
+            elif instr[0] in fmt5:
+                opstr = ops[0]
+                try:
+                    c = int(opstr,0)
+                    if c>127 or c<-128:
+                        print(f"Branch out of range. {c}")
+                        return None
+                except:
+                    relocs.append((target_address,"addrdelta",ops[0]))
+                cc = get_cond(instr[1])
+                if not cc:
+                    print(f"Failed to parse condition code '{instr[1]}'. Skipping output for '{filename}'")
+                    return None
+                oc = fmt5[instr[0]]
+                val = (oc<<12) | (c<<4) | cc
             else:
                 print(f"Unknown opcode '{instr[0]}'. Skipping output for '{filename}'.")
                 return None
@@ -236,10 +265,14 @@ def do_assembly( filename, lines ):
                 target_address += 1
 
     # Apply local relocations.
-    for (tgt,mode,valt) in relocs:
+    for (tgt,mode,full_valt) in relocs:
+        if full_valt[0:3]=="hi(" or full_valt[0:3]=="lo(":
+            valt = full_valt[3:-1]
+        else:
+            valt = full_valt
         if valt not in labels:
-                print(f"Attempt to use label '{valt}' not resolved. Skipping output for '{filename}'")
-                return None
+            print(f"Attempt to use label '{valt}' not resolved. Skipping output for '{filename}'")
+            return None
         val = labels[valt]
         if mode=="word":
             outvals[tgt] = val
@@ -247,6 +280,8 @@ def do_assembly( filename, lines ):
             outvals[tgt] = (outvals[tgt]&0xff00)|(val&0xff)
         elif mode=="highbyte":
             outvals[tgt] = (outvals[tgt]&0xff00)|((val>>8)&0xff)
+        elif mode=="addrdelta":
+            outvals[tgt] = (outvals[tgt]&0xf00f)|((val-tgt)&0xff)
         else:
             print(f"Failed to apply reloc '{mode}' using '{valt}'. Skipping output for '{filename}'")
             return None

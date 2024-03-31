@@ -1,0 +1,40 @@
+function main(empty) -> empty {
+    while(1) {
+        let _ = work(empty);
+    }
+    return empty;
+}
+
+function work(empty) -> empty {
+    var char -> int16;
+    let char = 32;
+    while( char < 128 ) {
+        var row -> int16;
+        let row = 0;
+        while( row < 30 ) {
+            var col -> int16;
+            let col = 0;
+            while( col < 80 ) {
+                let _ = write_char( char, col, row );
+            }
+        }
+        let char = char+1;
+    }
+    return empty;
+}
+
+function write_char( char->int16, x->int16, y->int16 ) -> empty {
+    var loc -> int16;
+    var loc2 -> int16;
+    let loc = (y<<8)|x;
+    let _ = _asm_out(char,loc);
+    return empty;
+}
+
+_asm("_asm_out:");
+_asm("  ld sp[0], r0");
+_asm("  ld sp[1], r1");
+_asm("  out r0, r1");
+_asm("  ret 0");
+
+

@@ -6,6 +6,11 @@
 # Classes that constitute the output of the parser and transformer
 #
 
+# Top level (only) line of assembly
+class AsmLine():
+    def __init__(self, literal ):
+        self.str = literal
+
 # Top level of a single function definition
 class FunctionDef():
     def __init__(self, name, params, return_type, code ):
@@ -80,6 +85,7 @@ class ExpNode():
     IDEN = "iden"
     LIT = "lit"
     CALL = "call"
+    EMPTY = "empty"
     def __init__(self,operator,operands):
         self.operator = operator
         self.operands = operands

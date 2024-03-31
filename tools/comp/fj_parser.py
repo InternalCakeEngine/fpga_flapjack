@@ -17,8 +17,13 @@ _flapjack_grammar = '''
 
 start: entity_list                                                                          -> childobj
 
-entity_list: function_def                                                                   -> childobj_list
-           | ( function_def entity_list )                                                   -> childobjpair_list
+entity_list: top_level_entity                                                               -> childobj_list
+           | ( top_level_entity entity_list )                                               -> childobjpair_list
+
+top_level_entity: function_def                                                              -> childobj
+                | asm_line                                                                  -> childobj
+
+asm_line: "_asm" "(" string  ")" ";"                                                        -> asm_literal_line
 
 function_def: "function" IDENTIFIER "(" formal_params_or_not ")" "->" type_name code_block  -> function_def
 
@@ -31,6 +36,7 @@ formal_param_single: IDENTIFIER "->" type_name                                  
 type_name: builtin_typename                                                                 -> childobj
 
 builtin_typename: "int16"                                                                   -> stringlit_int16
+                | "empty"                                                                   -> stringlit_empty
 
 code_block: "{" code_line_list "}"                                                          -> ordered_code_block
 
@@ -49,6 +55,7 @@ if_line: ( "if"    "(" expression ")" code_block "else" code_block )            
        | ( "if"    "(" expression ")" code_block  )                                         -> ifonly
 
 return_line: "return" expression ";"                                                        -> func_return
+           | "return" "empty" ";"                                                           -> func_return_empty
 
 expression: (   "(" expression ")" )                                                        -> exp_paren
           | binary_op_form                                                                  -> childobj
@@ -78,10 +85,14 @@ binary_op: "+"                                                                  
          | "!="                                                                             -> exp_binary_nequal
          | ">"                                                                              -> exp_binary_gt
          | "<"                                                                              -> exp_binary_lt
+         | ">>"                                                                             -> exp_binary_sright
+         | "<<"                                                                             -> exp_binary_sleft
 unary_prefix_op: "-"                                                                        -> op_unary_negate
 
+string: ESCAPED_STRING                                                                      -> childobj
 IDENTIFIER: CNAME
 
+%import common.ESCAPED_STRING
 %import common.CNAME
 %import common.INT
 '''
@@ -95,6 +106,9 @@ class CollectElements(Transformer):
 
     def stringlit_int16(self):
         return( "int16" )
+
+    def stringlit_empty(self):
+        return( "empty" )
 
     def tokenstring(self,token):
         return(token.value)
@@ -113,6 +127,9 @@ class CollectElements(Transformer):
 
     def function_def(self, func_name, param_list, return_type, code_block ):
         return FunctionDef( func_name, param_list, return_type, code_block )
+
+    def asm_literal_line(self, string_token):
+        return AsmLine( string_token.value )
 
     def ordered_code_block(self,linelist):
         return CodeBlock(linelist)
@@ -141,11 +158,13 @@ class CollectElements(Transformer):
     def func_return( self, exp ):
         return Return( exp )
 
+    def func_return_empty( self ):
+        return Return( None )
+
     def exp_paren( self, expression ):
         return expression
 
     def exp_call( self, name, params ):
-        print("Seen call")
         return ExpNode( ExpNode.CALL, [name]+params )
 
     def exp_binary( self, o1, op, o2 ):
@@ -180,6 +199,10 @@ class CollectElements(Transformer):
         return ExpOp(">")
     def exp_binary_lt(self):
         return ExpOp("<")
+    def exp_binary_sright(self):
+        return ExpOp(">>")
+    def exp_binary_sleft(self):
+        return ExpOp("<<")
     def exp_unary_negate(self):
         return ExpOp("-")
 

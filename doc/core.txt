@@ -14,7 +14,7 @@ Registers (all 16bit)
 
 Instruction format (all 16 bit)
 
-Format 1: jp, br
+Format 1: jp
 15             0
 |              |
 oooo------------    Opcode      (0..15)
@@ -23,13 +23,15 @@ oooo------------    Opcode      (0..15)
 ------------sfff    Condition/md
 
 
-Format 2: ld, st, add, sub, cmp, out, and, mov, shr
+Format 2: ld, st, add, sub, cmp, out, mov, bitwise
 15             0
 |              |
 oooo------------    Opcode      (0..15)
 ----xxxx--------    Operand 1   (r0..r15]
---------yyyy----    Operand 2   (r0..r5]
+--------yyyy----    Operand 2   (r0..r15]
 ------------a---    Op-modes for op1 (0=reg, 1=const)
+-------------iii    Address offset (ld/st only for now)
+-------------iii    Mode for bitwise (0==shl, 1=shr, 2=and, 3=or, 4=xor)
 
 Format 3: const
 15             0
@@ -45,6 +47,13 @@ Format 4: Specials
 ----xxxx--------    Extended code: 0=NOP, 1=CALL, 2=SAVEHIGH, 3=RET
 --------cccccccc    Constant (regnum and regs to save for CALL, stack
                     contraction for RET)
+
+Format 5: br
+15             0
+|              |
+oooo------------    Opcode      (0..15)
+----dddddddd----    Branch distance (sign extended 8 bit)
+------------sfff    Condition/md
 
 
 Memory is 65536 x 16bit words
@@ -75,10 +84,9 @@ Opcodes:
 06  sub     Sub             Sub O1 from O2
 07  cmp     Compare         Compare O1 to O2
 08  out     Write to IO     Write O1 into IO address O2
-09  const   Load 8bits      Write to O1 0x00nnn
-10  and     Bitwise and     And o1 and o2 -> o2
+09  const   Load 8bits      Shift O1 up eight 8 bit and put constant in low 8 bits.
+10  bits    Bitwise logic   Boolean and bitwise ops
 11  mov     Reg-reg move    Copy o1 into o2
-12  shr     Shift right     Shift o2 right by o1 bits
 
 ..15
 

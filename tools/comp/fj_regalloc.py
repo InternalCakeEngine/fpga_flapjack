@@ -12,7 +12,8 @@ from fj_ir_classes import *
 
 def fj_regalloc( func_list ):
     for func in func_list:
-        func["ir"] = _regalloc_func( func )
+        if "ir" in func:
+            func["ir"] = _regalloc_func( func )
 
 def _regalloc_func( func ):
 
@@ -45,18 +46,18 @@ def _build_live_list( steplist ):
             livelist.add(dst.iden)
         step["livesa"] = livelist.copy()
         for src in step["ir"].srcs:
-            if src.itype == "sa":
+            if src and src.itype == "sa":
                 lastreads[src.iden] = index
 
     for index, step in enumerate(steplist):
         dst = step["ir"].dst
         if dst and dst.itype == "sa":
-            if index >= lastreads[dst.iden]:
+            if (dst.iden not in lastreads) or index >= lastreads[dst.iden]:
                 dst.itype = 'nop'
                 dst.iden = None
         new_set = set()
         for sa in step["livesa"]:
-            if index <= lastreads[sa]:
+            if (sa in lastreads) and (index <= lastreads[sa]):
                 new_set.add(sa)
         step["livesa"] = new_set
 
@@ -78,14 +79,14 @@ def _reduce_to_2op( steplist ):
         if dst and dst.itype == "sa":
             dst.iden = renumbernotes.get(dst.iden,dst.iden)
         for src in step["ir"].srcs:
-            if src.itype == "sa":
+            if src and src.itype == "sa":
                 src.iden = renumbernotes.get(src.iden,src.iden)
         livecopy = set(step["livesa"])
         for sa in livecopy:
             if sa in renumbernotes:
                 step["livesa"].remove(sa)
         # Then mutate on a per-op basis.
-        if step["ir"].op == "add":
+        if step["ir"].op in ["add","sub","or","and","shl","shr"]:
             if step["ir"].srcs[1].itype=="sa" and step["ir"].dst.itype=="sa" and step["ir"].srcs[1].iden not in nextstep["livesa"]:
                 renumbernotes[step["ir"].dst.iden] = step["ir"].srcs[1].iden
                 step["livesa"].remove( step["ir"].dst.iden )

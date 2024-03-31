@@ -28,37 +28,58 @@ def fj_compile( proot ):
                 "ir":compiled_code,
                 "stackextent": entity.stackextent
             })
+            #for line in compiled_code:
+            #    try:
+            #        print(line.pretty())
+            #    except:
+            #        pass
+        elif isinstance(entity,AsmLine):
+            ir_res.append( {
+                "name": "__litasm",
+                "litstr": entity.str
+            })
     return ir_res
 
 
 def _compile_func( fd, label_state ):
     ssa_state = { "next":0 }
-    return _compile_block( fd.code, ssa_state, label_state )
+    return _compile_block( fd.code, ssa_state, label_state, True )
 
-def _compile_block( cb, ssa_state, label_state ):
+def _compile_block( cb, ssa_state, label_state, is_top_level ):
     # Iterate over the codelines.
     res = []
+    if not is_top_level:
+        if cb.stackextent>0:
+            res += [ IrStep("stack_extend", [IrLoc("c",cb.stackextent)], None ) ]
     for codeline in cb.lines:
         codeline.compiled = None
         if isinstance(codeline,Assignment):
-            assigned_var = cb.find_var_by_name( codeline.name )
-            if assigned_var == None:
-                print(f"Failed to find variable {codeline.name}")
-                exit(1)
+            if codeline.name == "_":
+                assigned_var = None
+            else:
+                assigned_var = cb.find_var_by_name( codeline.name )
+                if assigned_var == None:
+                    print(f"Failed to find variable {codeline.name}")
+                    exit(1)
             dest_sa = get_next_sa(ssa_state)
             codeline.exp.dest_sa = dest_sa
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
-            exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",assigned_var.offset)) ]
+            if assigned_var:
+                exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",assigned_var.offset)) ]
             codeline.compiled = exp_code
         elif isinstance(codeline,Return):
-            codeline.exp.dest_sa = get_next_sa(ssa_state)
-            exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
-            codeline.compiled = exp_code+compile_return(codeline.exp.dest_sa,cb.stackextent)
+            if codeline.exp == None:
+                codeline.compiled=[]
+                codeline.compiled = compile_return(None,cb.stackextent,True)
+            else:
+                codeline.exp.dest_sa = get_next_sa(ssa_state)
+                exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
+                codeline.compiled = exp_code+compile_return(codeline.exp.dest_sa,cb.stackextent,False)
         elif isinstance(codeline,WhileLoop):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
             codeline.code_block.stackextent = cb.stackextent
-            body_code = _compile_block(codeline.code_block,ssa_state,label_state)
+            body_code = _compile_block(codeline.code_block,ssa_state,label_state,False)
             top_label = get_next_label(label_state)
             end_label = get_next_label(label_state)
             codeline.compiled =  [
@@ -80,11 +101,11 @@ def _compile_block( cb, ssa_state, label_state ):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
             codeline.code_block.stackextent = cb.stackextent
-            body_code_if   = _compile_block( codeline.code_block_if,   ssa_state, label_state )
+            body_code_if   = _compile_block( codeline.code_block_if,   ssa_state, label_state, False )
             body_code_else = None
             if codeline.code_block_else:
                 codeline.code_block.stackextent = cb.stackextent
-                body_code_else = _compile_block( codeline.code_block_else, ssa_state, label_state )
+                body_code_else = _compile_block( codeline.code_block_else, ssa_state, label_state, False )
             else_label = get_next_label(label_state)
             end_label = get_next_label(label_state)
             codeline.compiled  = exp_code
@@ -104,11 +125,17 @@ def _compile_block( cb, ssa_state, label_state ):
             codeline.compiled += [ IrStep("label",[end_label],None) ]
         if codeline.compiled:
             res += codeline.compiled
+    if not is_top_level:
+        if cb.stackextent>0:
+            res += [ IrStep("stack_retract", [IrLoc("c",cb.stackextent)], None ) ]
     return res
     
 
-def compile_return(sa,spdelta):
-    return [ IrStep("ret",[IrLoc("sa",sa),IrLoc("c",spdelta)],None) ]
+def compile_return(sa,spdelta,isempty):
+    if isempty:
+        return [ IrStep("ret",[None,IrLoc("c",spdelta)],None) ]
+    else:
+        return [ IrStep("ret",[IrLoc("sa",sa),IrLoc("c",spdelta)],None) ]
 
 def compile_expression(cb,exp,ssa_state,label_state):
     output = []
@@ -121,12 +148,11 @@ def compile_expression(cb,exp,ssa_state,label_state):
     elif exp.operator == ExpNode.LIT:
         output.append( IrStep("const", [IrLoc("lab",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.CALL:
-        print("Seen ExpNode.CALL")
         plist = [ IrLoc("a",exp.operands[0]) ]
         for param in exp.operands[1:]:
             param.dest_sa = get_next_sa(ssa_state)
             output += compile_expression(cb,param,ssa_state,label_state)
-            plist += IrLoc("sa",param.dest_sa)
+            plist += [ IrLoc("sa",param.dest_sa) ]
         output += [ IrStep("call", plist, IrLoc("sa",exp.dest_sa)) ]
     else:
         for operand in exp.operands:
@@ -134,12 +160,19 @@ def compile_expression(cb,exp,ssa_state,label_state):
             operand.code = compile_expression(cb,operand,ssa_state,label_state)
         if exp.operator.op == "+":
             nodecode = [ IrStep("add", [IrLoc("sa",exp.operands[0].dest_sa),IrLoc("sa",exp.operands[1].dest_sa)], IrLoc("sa",exp.dest_sa) ) ]
-        elif exp.operator.op == ">":
+        elif exp.operator.op in ["<<",">>","&","|"]:
+            oname = {"<<":"shl",">>":"shr","&":"and","|":"or"}[exp.operator.op]
+            nodecode = [ IrStep(oname, [IrLoc("sa",exp.operands[1].dest_sa),IrLoc("sa",exp.operands[0].dest_sa)], IrLoc("sa",exp.dest_sa) ) ]
+        elif exp.operator.op in ["<",">"]:
             hop_label = get_next_label(label_state)
+            if exp.operator.op == ">":
+                compflags = "gt"    # Result is greater-than
+            else:
+                compflags = "lt"    # Result is less-than
             nodecode = [
                 IrStep("load", [IrLoc("c",1)], IrLoc("sa",exp.dest_sa)),
                 IrStep("cmp", [IrLoc("sa",exp.operands[0].dest_sa),IrLoc("sa",exp.operands[1].dest_sa)], None ),
-                IrStep("branch_cond", [hop_label,IrLoc("cc","gt")],None),
+                IrStep("branch_cond", [hop_label,IrLoc("cc",compflags)],None),
                 IrStep("load", [IrLoc("c",0)], IrLoc("sa",exp.dest_sa)),
                 IrStep("label",[hop_label],None)
             ]
@@ -159,7 +192,7 @@ def compile_expression(cb,exp,ssa_state,label_state):
                 IrStep("label",[hop_label],None)
             ]
         else:
-            print(f"Encountered unknown operator {exp.operator}")
+            print(f"Encountered unknown operator {exp.operator.op}")
             exit(1)
         return exp.operands[0].code + exp.operands[1].code + nodecode
     return output

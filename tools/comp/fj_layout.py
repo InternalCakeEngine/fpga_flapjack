@@ -19,39 +19,42 @@ def fj_layout( proot ):
 
 
 def _layout_function( fd ):
-    initial_offset = 0  # For saving the CT; size is offset+1.
+    _do_layout( fd.code, fd.params, 0 )
+    #print(f"Stack extent of func {fd.name} is {fd.code.stackextent}")
+    fd.stackextent = fd.code.stackextent
+    param_offset = len(fd.params)
     for param in fd.params:
-        param.offset = initial_offset
-        initial_offset += 1
-    fd.param_local_limit = initial_offset
-    full_offset = _do_layout( fd.code, fd.params, initial_offset )
-    fd.stackextent = full_offset
+        param.offset = fd.stackextent++param_offset
+        param_offset -= 1
 
 def _do_layout( cb, parentcb, offset ):
-    cb.offset = offset
     cb.parent = parentcb
-    max_offset = offset
+    initial_offset = offset
+    local_extent = 0
+    for line in cb.lines:
+        if isinstance(line,LocalVar):
+            local_extent += 1
+    cb.stackextent = local_extent
+    local_offset = 0
     for line in cb.lines:
         line.set_cb(cb)
         if isinstance(line,LocalVar):
-            line.offset = offset
-            offset += 1
+            line.offset = (initial_offset+local_extent)-(local_offset+1)
+            #print(f"Total offset of {line.name} is {line.offset} (local_extent={local_extent}")
+            local_offset += 1
         elif isinstance(line,CodeBlock):
-            _do_layout( line, cb, offset )
+            _do_layout( line, cb, initial_offset+local_extent )
         elif isinstance(line,Assignment):
             pass
         elif isinstance(line,WhileLoop):
-            _do_layout( line.code_block, cb, offset )
+            _do_layout( line.code_block, cb, initial_offset+local_extent )
         elif isinstance(line,IfElse):
-            _do_layout( line.code_block_if, cb, offset )
+            _do_layout( line.code_block_if, cb, initial_offset+local_extent )
             if line.code_block_else:
-                _do_layout( line.code_block_else, cb, offset )
+                _do_layout( line.code_block_else, cb, initial_offset+local_extent )
         elif isinstance(line,Return):
             pass
         else:
             print(f"Met unknown linetype in layout: {line}")
             exit(1)
-    return offset   # Initial offset, not max offset!
-
-
 
