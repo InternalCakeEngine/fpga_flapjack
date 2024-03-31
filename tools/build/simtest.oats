@@ -16,7 +16,9 @@ function work(empty) -> empty {
             let col = 0;
             while( col < 80 ) {
                 let _ = write_char( char, col, row );
+                let col = col+1;
             }
+            let row = row+1;
         }
         let char = char+1;
     }

@@ -102,6 +102,7 @@ def get_cond(cstr):
         return None
     if seen_pos:
         f |= 8
+    print(f"#### COND {cstr} -> {f}")
     return f
 
 fmt1 = {
@@ -281,7 +282,7 @@ def do_assembly( filename, lines ):
         elif mode=="highbyte":
             outvals[tgt] = (outvals[tgt]&0xff00)|((val>>8)&0xff)
         elif mode=="addrdelta":
-            outvals[tgt] = (outvals[tgt]&0xf00f)|((val-tgt)&0xff)
+            outvals[tgt] = (outvals[tgt]&0xf00f)|(((val-tgt)&0xff)<<4)
         else:
             print(f"Failed to apply reloc '{mode}' using '{valt}'. Skipping output for '{filename}'")
             return None

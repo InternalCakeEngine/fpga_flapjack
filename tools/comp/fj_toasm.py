@@ -40,7 +40,7 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
             src = stepir.srcs[0]
             dst = stepir.dst
             if src.itype=="l" and dst.itype=="r":
-                lines.append(f"  ld  sp[{stack_offset-src.iden}], {dst.iden}")
+                lines.append(f"  ld  sp[{stack_offset+src.iden}], {dst.iden}   # stack_offset={stack_offset}, src.iden={src.iden}")
             elif src.itype=="c" and dst.itype=="r":
                 lines.append(f"  mov  {src.iden}, {dst.iden}")
             else:
@@ -49,7 +49,7 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
             src = stepir.srcs[0]
             dst = stepir.dst
             if src.itype=="r" and dst.itype=="l":
-                lines.append(f"  st  {src.iden}, sp[{stack_offset-dst.iden}]")
+                lines.append(f"  st  {src.iden}, sp[{stack_offset+dst.iden}]")
             else:
                 lines.append(f"  BAD STORE: {stepir.pretty()}")
         elif stepir.op == "call":
@@ -92,15 +92,18 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
                 lines.append(f"  {oname}  {src1.iden}, {dst.iden}")
             else:
                 lines.append(f"  BAD OP: {stepir.pretty()}")
-        elif stepir.op == "ret":
-            src = stepir.srcs[0]
-            if src:
-                if src.itype=="r":
-                    lines.append(f"  mov  {src.iden}, r0")
-                    lines.append(f"  ld  sp[{initial_stack_extent}], ct")
-                else:
-                    lines.append(f"  BAD RET: {stepir.pretty()}")
-            lines.append(f"  ret {stepir.srcs[1].iden+1}")
+        elif stepir.op == "ret":    # Only from top level of function atm. Needs stack_offset handling.
+            if stack_offset != 0:
+                lines.append("  BAD RET: mid func exit")
+            else:
+                src = stepir.srcs[0]
+                if src:
+                    if src.itype=="r":
+                        lines.append(f"  mov  {src.iden}, r0")
+                    else:
+                        lines.append(f"  BAD RET: {stepir.pretty()}")
+                lines.append(f"  ld sp[{initial_stack_extent}], ct")
+                lines.append(f"  ret {stepir.srcs[1].iden+1}")
         elif stepir.op == "const":
             src = stepir.srcs[0]
             dst = stepir.dst
