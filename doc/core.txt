@@ -30,7 +30,7 @@ oooo------------    Opcode      (0..15)
 ----xxxx--------    Operand 1   (r0..r15]
 --------yyyy----    Operand 2   (r0..r15]
 ------------a---    Op-modes for op1 (0=reg, 1=const)
--------------iii    Address offset (ld/st only for now)
+-------------iii    Address offset (ld/st only)
 -------------iii    Mode for bitwise (0==shl, 1=shr, 2=and, 3=or, 4=xor)
 
 Format 3: const
