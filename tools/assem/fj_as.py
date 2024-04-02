@@ -102,7 +102,6 @@ def get_cond(cstr):
         return None
     if seen_pos:
         f |= 8
-    print(f"#### COND {cstr} -> {f}")
     return f
 
 fmt1 = {

@@ -25,7 +25,7 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
         f"  st  ct, sp[{initial_stack_extent}]" # Only necessary for non-leaf functions.
     ]
 
-    stack_offset = 0
+    stack_offset = initial_stack_extent
     for step in funcir:
         stepir = step["ir"]
         if stepir.op=="stack_extend":
@@ -93,7 +93,7 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
             else:
                 lines.append(f"  BAD OP: {stepir.pretty()}")
         elif stepir.op == "ret":    # Only from top level of function atm. Needs stack_offset handling.
-            if stack_offset != 0:
+            if stack_offset != initial_stack_extent:
                 lines.append("  BAD RET: mid func exit")
             else:
                 src = stepir.srcs[0]

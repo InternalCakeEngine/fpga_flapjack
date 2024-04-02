@@ -55,10 +55,10 @@ def work():
             if op1_raw == 1:
                 # Call
                 rmask = instr&255;
-                for b in range(0,8):
-                    if (rmask&(1<<b))!=0:
-                        mem[regs[SP]] = regs[b]
-                        regs[SP] -= 1
+                #for b in range(0,4):
+                #    if (rmask&(1<<b))!=0:
+                #        mem[regs[SP]] = regs[b]
+                #        regs[SP] -= 1
                 regs[CT] = regs[IP]+1
                 regs[IP] = op2
                 inhibit_step = True
@@ -122,7 +122,7 @@ def work():
             regs[op2_raw] >>= op1_raw if op1_mode else op1
         if not inhibit_step:
             regs[IP] += 1
-        print(f"{prestr}  regs  "+"  ".join( [ f"{n}:{(x&65535):04x}" for n,x in enumerate(regs) ] ))
+        #print(f"{prestr}  regs  "+"  ".join( [ f"{n}:{(x&65535):04x}" for n,x in enumerate(regs) ] ))
 
     print("Exit with:")
     print("  ".join( [ f"{n}:{(x&65535):04x}" for n,x in enumerate(regs) ] ))
