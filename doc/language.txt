@@ -1,0 +1,140 @@
+Primitive types are "int16" and "block" and "empty" where a designation of
+'nothng' is required.
+
+An int16 is a 16 bit unsigned value. The value of an int16 is exactly the
+value stored and is never a reference.
+
+A block is a reference to a piece of memory. The value of a block is a 
+reference to a piece of memory and therefore the content is always passed
+by reference.
+
+
+
+Function declarations
+---------------------
+
+A function definition is of the form:
+
+    function <name>(<formal parameter list>) -> <return type>
+        <code block>
+
+A code block is a list of statements surrounded by braces.
+
+Name are opaque identifiers in the same form as C identifiers.
+
+The formal parameter list is of the form of one or more comma separated 
+formal parameters, or "empty" where there are none. A formal parameter
+is specified as:
+
+    <identifier> -> <type>
+
+An example:
+
+    function addtwo( x->int16, y->int16 ) -> int16 {
+        return x+y;
+    }
+
+A function with no parameters, returning nothing would be:
+
+    function null( empty ) -> empty {
+        return empty;
+    }
+
+
+Variable declarations
+---------------------
+
+Local variable declarations can be made anywhere in a code block and
+are in-scope anywhere in that code block (not just after the declaration).
+A variable declaration is of the form:
+
+    var <identifier> -> int16;
+
+An example:
+
+    var foo -> int16;
+
+Assignments
+-----------
+
+Assignments are restricted to specific assignment statements, denoted by
+the "let" keyword. An assignment is of the form:
+
+    let <identifier> = <expression>;
+
+An example:
+
+    let foo = 10;
+
+Expression are only evaluates as part of a statement. To evaluate an expression
+(which might include a function call with side-effects) by itself, the let expression
+can be used with the null variable _ (underscore).  For example:
+
+    let _ = some_side_effect(10);
+
+In such cases any return value is thrown away.
+
+Loops
+-----
+
+The only looping construct is the while loop, designated by the "while" keyword.
+It behaves are a normal C family languge while loop. Numeric results are interpreted
+as 0 for false and anything else for true. A while loop is of the form:
+
+    while( <expression ) <code block>
+
+An example:
+
+    while( foo < 10 ) {
+        let bar = bar+1;
+    }
+
+Alternation
+-----------
+
+Alternation is achieved with the if/else clause (else is optional). Interpretation
+of numeric values is the same as while (0=>false, else true).  A if statement takes the
+form:
+
+    if( <expression ) <code block> else <code block>
+   
+
+or
+
+    if( <expression> ) <code block>
+
+An example:
+
+    if( bar==2 ) {
+        let foo=1;
+    } else {
+        let foo=2;
+    }
+
+Returning from functions
+------------------------
+
+The only legitimate way to exit a function is with the return statement, which takes the
+form:
+
+    return <expresion>
+
+An example:
+
+    return 10;
+
+Note that brackets are allows, but are part of the expresion, not the return statement.
+
+Expression
+----------
+
+Expressions are substantially the same as in the C langugage with big caveats about types,
+and there are no assignment operators of any kind. The ternary operate is currently missing.
+
+An example:
+
+    x+3+func(3)
+
+
+
+

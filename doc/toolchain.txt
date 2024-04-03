@@ -1,0 +1,52 @@
+The tool chains consists (as of 3rd March 2024), two tools:
+
+The assembler
+-------------
+
+Accepts an ASCII input as a series of assembler instructions and
+outputs a fully linked binary in the form of a 16 bit word (in hex)
+per link. This is the input format for a memory block initialiser
+in Vivaro.
+
+The compiler is 2-pass and therefore accepts forward references.
+
+Lines that start with .org X set the current assembly target address
+(defaults to 0).
+
+Lines that strat with .word X insert that 16 bit constant into the
+output.
+
+Lines that finish with a colon are interpreted as label definitions.
+
+Everything else is treated like a line of assembly code.
+
+Labels can be used with most instructions where a constant is 
+allowed. Widths are not checked!
+
+
+The compiler
+------------
+
+Accepts an oats program in ASCII and outputs ASCII asssembler that 
+can be read by the assembler.
+
+The compiler works in several passes:
+
+    Parse - uses Lark to build the source into an AST which is immediately
+    transformed into a hierarchical data structure.
+
+    Layout - All local variables and parameters are given stack locations
+    and the stack offset for each statement is calculated.
+
+    Compile - The hierarchical data structure is transforms to a linear IR
+    with single static assignment for data handling.
+
+    Regalloc - SSA locations are transformed into registers, and liveness
+    is calculated. Spilling NYI.
+
+    Toasm - the IR with register allocations is transformed into assembly code
+    for output.
+
+
+
+
