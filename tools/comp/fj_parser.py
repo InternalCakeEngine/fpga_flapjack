@@ -21,9 +21,18 @@ entity_list: top_level_entity                                                   
            | ( top_level_entity entity_list )                                               -> childobjpair_list
 
 top_level_entity: function_def                                                              -> childobj
+                | var_decl_line                                                             -> childobj
+                | struct_def_line                                                           -> childobj
                 | asm_line                                                                  -> childobj
 
 asm_line: "_asm" "(" string  ")" ";"                                                        -> asm_literal_line
+
+struct_def_line: "structure" IDENTIFIER "->" "{" struct_elem_list "}"                       -> struct_def
+
+struct_elem_list: struct_elem                                                               -> childobj_list
+                | ( struct_elem struct_elem_list )                                          -> childobjpair_list
+
+struct_elem: IDENTIFIER "->" type_name ";"                                                  -> struct_elem
 
 function_def: "function" IDENTIFIER "(" formal_params_or_not ")" "->" type_name code_block  -> function_def
 
@@ -33,10 +42,12 @@ formal_params: formal_param_single                                              
                  | ( formal_param_single "," formal_params )                                -> childobjpair_list
 formal_param_single: IDENTIFIER "->" type_name                                              -> var_declaration
 
-type_name: builtin_typename                                                                 -> childobj
+type_name: "ref" "(" type_name ")"                                                          -> ref_wrap
+         | IDENTIFIER                                                                       -> childobj
+         | builtin_typename                                                                 -> childobj
 
-builtin_typename: "int16"                                                                   -> stringlit_int16
-                | "empty"                                                                   -> stringlit_empty
+builtin_typename: "int16"                                                                   -> simpletype_int16
+                | "empty"                                                                   -> simpletype_empty
 
 code_block: "{" code_line_list "}"                                                          -> ordered_code_block
 
@@ -48,7 +59,10 @@ code_line: code_block                                                           
 
 var_decl_line: "var" IDENTIFIER "->" type_name ";"                                          -> var_declaration
 
-assignment_line: "let" IDENTIFIER "=" expression ";"                                        -> assignment
+assignment_line: "let" assign_target "=" expression ";"                                     -> assignment
+
+assign_target: IDENTIFIER                                                                   -> simple_assign_target
+             | IDENTIFIER subscript_list                                                    -> list_assign_target
 
 while_line: "while" "(" expression ")" code_block                                           -> while_loop
 if_line: ( "if"    "(" expression ")" code_block "else" code_block )                        -> ifelse
@@ -57,12 +71,20 @@ if_line: ( "if"    "(" expression ")" code_block "else" code_block )            
 return_line: "return" expression ";"                                                        -> func_return
            | "return" "empty" ";"                                                           -> func_return_empty
 
-expression: (   "(" expression ")" )                                                        -> exp_paren
+expression: ( "(" expression ")" )                                                          -> exp_paren
+          | reference                                                                       -> childobj
           | binary_op_form                                                                  -> childobj
           | unary_prefix_op_form                                                            -> childobj
           | function_call                                                                   -> childobj
           | IDENTIFIER                                                                      -> exp_identifier
           | INT                                                                             -> exp_literal
+          | index                                                                           -> childobj
+
+index: expression subscript_list                                                            -> exp_index
+subscript_list: "[" expression "]"                                                          -> childobj_list
+              | ( "[" expression "]" subscript_list )                                       -> childobjpair_list
+
+reference: "{" expression "}"                                                               -> exp_reference
 
 function_call: IDENTIFIER "(" call_params_or_not ")"                                        -> exp_call
 
@@ -104,11 +126,11 @@ class CollectElements(Transformer):
     def __init__(self):
         self.functions = {}
 
-    def stringlit_int16(self):
-        return( "int16" )
+    def simpletype_int16(self):
+        return( SimpleType("int16") )
 
-    def stringlit_empty(self):
-        return( "empty" )
+    def simpletype_empty(self):
+        return( SimpleType("empty") )
 
     def tokenstring(self,token):
         return(token.value)
@@ -152,9 +174,6 @@ class CollectElements(Transformer):
     def var_declaration( self, name, vtype ):
         return LocalVar( name, vtype )
 
-    def typename_int16( self ):
-        return("int16")
-
     def func_return( self, exp ):
         return Return( exp )
 
@@ -166,6 +185,12 @@ class CollectElements(Transformer):
 
     def exp_call( self, name, params ):
         return ExpNode( ExpNode.CALL, [name]+params )
+
+    def exp_index( self, exp, sublist ):
+        return ExpSub(exp,sublist)
+
+    def exp_reference( self, exp ):
+        return ExpRef(exp)
 
     def exp_binary( self, o1, op, o2 ):
         return ExpNode( op, [o1,o2] )
@@ -205,6 +230,15 @@ class CollectElements(Transformer):
         return ExpOp("<<")
     def exp_unary_negate(self):
         return ExpOp("-")
+
+    def struct_def( self, name, elemlist ):
+        return StructDef( name, elemlist )
+
+    def struct_elem( self, name, elem ):
+        return StructElem( name, elem )
+
+    def ref_wrap( self, wrapped ):
+        return RefType( wrapped )
 
 try:
     _fj_generated = Lark( _flapjack_grammar, parser="lalr", transformer=CollectElements() )

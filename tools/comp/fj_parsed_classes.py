@@ -95,4 +95,53 @@ class ExpOp():
     def __init__(self,op):
         self.op = op
 
+class ExpSub():
+    def __init__(self,exp,sublist):
+        self.exp = exp
+        self.sublist = sublist
+
+class ExpRef():
+    def __init__(self,exp):
+        self.exp = exp
+
+
+# Definition of a struct
+class StructDef():
+    def __init__(self,name,elemlist):
+        self.name = name
+        self.elemlist = elemlist
+
+    def __str__(self):
+        return f"struct {self.name} {{ [e for e in self.elemlist] }}"
+
+class StructElem():
+    def __init__(self,name,elemtype):
+        self.name = name
+        self.elemtype = elemtype
+
+    def __str__(self):
+        return f"{self.name}->{self.elemtype})"
+
+# Type shenannigans
+class SimpleType():
+    def __init__(self,typename):
+        self.typename = typename
+
+    def __str__(self):
+        return f"{self.typename}"
+
+    def __eq__(self,other):
+        return isinstance(other,SimpleType) and self.typename == other.typename
+
+class RefType():
+    def __init__(self,wrapped):
+        self.wrapped = wrapped
+
+    def __str__(self):
+        return f"ref({self.wrapped})"
+
+    def __eq__(self,other):
+        return isinstance(other,RefType) and self.wrapped == other.wrapped
+
+
 

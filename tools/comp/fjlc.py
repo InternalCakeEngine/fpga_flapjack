@@ -9,13 +9,14 @@
 import sys
 
 from fj_parser import fj_parser
+from fj_usertypes import fj_buildtypes
 from fj_layout import fj_layout
 from fj_compile import fj_compile
 from fj_regalloc import fj_regalloc
 from fj_toasm import fj_toasm
 
 def main():
-    with open(sys.argv[1],"r") as infile:
+    with open(sys.argv[1],"r", encoding="utf-8") as infile:
         inlines = "\n".join(infile.readlines())
     try:
         objform = fj_parser( inlines )
@@ -23,9 +24,10 @@ def main():
         print("Exception parsing input.")
         print(e)
         exit(1)
+    fj_buildtypes( objform )                # Build user defined types.
     fj_layout( objform )                    # Setup home locations for params and locals
     ir_list = fj_compile( objform )         # Compile to IR
-    fj_regalloc( ir_list )        # Allocated register, inject spills and stack allocs.
+    fj_regalloc( ir_list )                  # Allocated register, inject spills and stack allocs.
     out = fj_toasm( ir_list )               # Transform IR to assembly
 
 if __name__ == '__main__':

@@ -1,0 +1,80 @@
+structure slice -> {
+    base        -> ref(int16);
+    unit_size   -> int16;
+    dim_length  -> int16;
+    dim_stride  -> int16;
+}
+
+var screen_map -> ref(int16);
+
+function main(empty) -> empty {
+    let screen_map = malloc(80*30);
+    var screen_lines -> slice;
+    let screen_lines = make_slice( screen_map, 80, 30, 80 );
+    var char -> int16;
+    let char = 32;
+    while(1) {
+        var y -> int16;
+        let y = 1;
+        while( y<30 ) {
+            var screen_line_this -> slice;
+            var screen_line_next -> slice;
+            let screen_line_this = init_slice( screen_lines[y-1], 1, 80, 1 );
+            let screen_line_next = init_slice( screen_lines[y], 1, 80, 1 );
+            let _ = copy_line( ref(screen_line_this), ref(screen_line_next) );
+        }
+        var bottom_line -> slice;
+        let bottom_line = init_slice( screen_lines[29], 1, 80, 1 );
+        let _ = fill_line( ref(bottom_line), char );
+        let _ = show_screen( ref(screen_lines) );
+        let char = char+1;
+        if( char>127 ) {
+            let char = 32;
+        }
+    }
+    return empty;
+}
+
+function copy_line( from_line->ref(slice), to_line->ref(slice) ) -> empty {
+    var x -> int16;
+    let x = 0;
+    while( x<80 ) {
+        let to_line[x] = from_line[x];
+    }
+    return empty;
+}
+
+function show_screen( screen_map->ref(slice) ) -> empty {
+    var y -> int16;
+    let y = 0;
+    while( y<30 ) {
+        var screen_line -> slice;
+        let screen_line = init_slice( screen_lines[y-1], 1, 80, 1 );
+        var x -> int16;
+        let x=0;
+        while( x<80 ) {
+            var c -> int16;
+            let c = screen_line[x];
+            let _ = write_char( c, x, y );
+            let x=x+1;
+        }
+        let y=y+1;
+    }
+    return empty;
+}
+
+
+function write_char( char->int16, x->int16, y->int16 ) -> empty {
+    var loc -> int16;
+    let loc = (x<<8)|y;
+    let _ = _asm_out(char,loc);
+    return empty;
+}
+
+_asm("_asm_out:");
+_asm("  ld sp[0], r10");
+_asm("  ld sp[1], r11");
+_asm("  out r11, r10");
+_asm("  ret 0");
+
+

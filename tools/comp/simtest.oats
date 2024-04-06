@@ -1,6 +1,0 @@
-function loads(empty) -> int16 {
-    var x -> int16;
-    let x = 23;
-    return x;
-}
-
