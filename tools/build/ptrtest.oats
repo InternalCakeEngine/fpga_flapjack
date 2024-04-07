@@ -1,0 +1,20 @@
+function main(empty) -> empty {
+    while(1) {
+        let _ = work(empty);
+    }
+    return empty;
+}
+
+function fill_screen( char -> int16, screen -> ref(slice) ) {
+    var y -> int16;
+    let y=0;
+    while( y<30 ) {
+        var x -> int16;
+        let x=0;
+        while( x<80 ) {
+            let screen[x][y] = char;
+        }
+        let y=y+1;
+    }
+}
+

@@ -43,7 +43,7 @@ formal_params: formal_param_single                                              
 formal_param_single: IDENTIFIER "->" type_name                                              -> var_declaration
 
 type_name: "ref" "(" type_name ")"                                                          -> ref_wrap
-         | IDENTIFIER                                                                       -> childobj
+         | IDENTIFIER                                                                       -> usertype
          | builtin_typename                                                                 -> childobj
 
 builtin_typename: "int16"                                                                   -> simpletype_int16
@@ -61,8 +61,8 @@ var_decl_line: "var" IDENTIFIER "->" type_name ";"                              
 
 assignment_line: "let" assign_target "=" expression ";"                                     -> assignment
 
-assign_target: IDENTIFIER                                                                   -> simple_assign_target
-             | IDENTIFIER subscript_list                                                    -> list_assign_target
+assign_target: staged_identifier                                                            -> simple_assign_target
+             | staged_identifier subscript_list                                             -> subscripted_assign_target
 
 while_line: "while" "(" expression ")" code_block                                           -> while_loop
 if_line: ( "if"    "(" expression ")" code_block "else" code_block )                        -> ifelse
@@ -76,7 +76,7 @@ expression: ( "(" expression ")" )                                              
           | binary_op_form                                                                  -> childobj
           | unary_prefix_op_form                                                            -> childobj
           | function_call                                                                   -> childobj
-          | IDENTIFIER                                                                      -> exp_identifier
+          | staged_identifier                                                               -> exp_identifier
           | INT                                                                             -> exp_literal
           | index                                                                           -> childobj
 
@@ -111,6 +111,11 @@ binary_op: "+"                                                                  
          | "<<"                                                                             -> exp_binary_sleft
 unary_prefix_op: "-"                                                                        -> op_unary_negate
 
+staged_identifier: onestage_identifier                                                      -> childobj
+                 | [ onestage_identifier "." staged_identifier ]                            -> concat_identifier
+
+onestage_identifier: IDENTIFIER                                                             -> identifier
+
 string: ESCAPED_STRING                                                                      -> childobj
 IDENTIFIER: CNAME
 
@@ -127,10 +132,10 @@ class CollectElements(Transformer):
         self.functions = {}
 
     def simpletype_int16(self):
-        return( SimpleType("int16") )
+        return( SimpleTypeUse("int16") )
 
     def simpletype_empty(self):
-        return( SimpleType("empty") )
+        return( SimpleTypeUse("empty") )
 
     def tokenstring(self,token):
         return(token.value)
@@ -187,7 +192,7 @@ class CollectElements(Transformer):
         return ExpNode( ExpNode.CALL, [name]+params )
 
     def exp_index( self, exp, sublist ):
-        return ExpSub(exp,sublist)
+        return ExpSubscript(exp,sublist)
 
     def exp_reference( self, exp ):
         return ExpRef(exp)
@@ -232,13 +237,28 @@ class CollectElements(Transformer):
         return ExpOp("-")
 
     def struct_def( self, name, elemlist ):
-        return StructDef( name, elemlist )
+        return StructDef( name.value, elemlist )
 
     def struct_elem( self, name, elem ):
-        return StructElem( name, elem )
+        return StructElemDef( name, elem )
 
     def ref_wrap( self, wrapped ):
-        return RefType( wrapped )
+        return RefTypeUse( wrapped )
+
+    def usertype( self, name ):
+        return UserTypeUse( name );
+
+    def identifier( self, name ):
+        return Identifier([name.value],[]);
+
+    def concat_identifier( self, name, rest ):
+        return Identifier( name.names+rest.names, [] )
+
+    def simple_assign_target( self, target ):
+        return Identifier( target.names, [] )
+
+    def subscripted_assign_target( self, target, rest ):
+        return Identifier( target.names+rest.names )
 
 try:
     _fj_generated = Lark( _flapjack_grammar, parser="lalr", transformer=CollectElements() )

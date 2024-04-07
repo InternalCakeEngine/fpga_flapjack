@@ -26,17 +26,20 @@ class CodeBlock():
         self.offset = 0
         self.parent = None
 
-    def find_var_by_name( self, name ):
+    def find_var_by_name( self, iden ):
         for line in self.lines:
-            if isinstance(line,LocalVar) and line.name==name:
+            if isinstance(line,LocalVar) and line.name==iden.names[0]:
                 return line
         if self.parent:
             if isinstance(self.parent,list):
                 for param in self.parent:
-                    if param.name==name:
+                    if param.name==iden.names[0]:
                         return param
             else:
-                return self.parent.find_var_by_name(name)
+                return self.parent.find_var_by_name(iden)
+        else:
+            # We should look in the global namespace here but we have no route to it (yet).
+            pass
         return None
 
 # A single code line.
@@ -89,13 +92,14 @@ class ExpNode():
     def __init__(self,operator,operands):
         self.operator = operator
         self.operands = operands
+        self.utype = None
 
 # The operator type at a non-lead nonde in an expression tree.
 class ExpOp():
     def __init__(self,op):
         self.op = op
 
-class ExpSub():
+class ExpSubscript():
     def __init__(self,exp,sublist):
         self.exp = exp
         self.sublist = sublist
@@ -114,7 +118,7 @@ class StructDef():
     def __str__(self):
         return f"struct {self.name} {{ [e for e in self.elemlist] }}"
 
-class StructElem():
+class StructElemDef():
     def __init__(self,name,elemtype):
         self.name = name
         self.elemtype = elemtype
@@ -122,8 +126,8 @@ class StructElem():
     def __str__(self):
         return f"{self.name}->{self.elemtype})"
 
-# Type shenannigans
-class SimpleType():
+# Type shenannigans as parsed (processed version in fj_type_classes.py.
+class SimpleTypeUse():
     def __init__(self,typename):
         self.typename = typename
 
@@ -131,9 +135,9 @@ class SimpleType():
         return f"{self.typename}"
 
     def __eq__(self,other):
-        return isinstance(other,SimpleType) and self.typename == other.typename
+        return isinstance(other,SimpleTypeUse) and self.typename == other.typename
 
-class RefType():
+class RefTypeUse():
     def __init__(self,wrapped):
         self.wrapped = wrapped
 
@@ -141,7 +145,23 @@ class RefType():
         return f"ref({self.wrapped})"
 
     def __eq__(self,other):
-        return isinstance(other,RefType) and self.wrapped == other.wrapped
+        return isinstance(other,RefTypeUse) and self.wrapped == other.wrapped
 
 
+class UserTypeUse():
+    def __init__(self,typename):
+        self.typename = typename
 
+    def __str__(self):
+        return f"ref({self.typename})"
+
+    def __eq__(self,other):
+        return isinstance(other,UserTypeUse) and self.typename == other.typename
+
+class Identifier():
+    def __init__(self,names,subs):
+        self.names = names
+        self.subs = subs        # Only for assginement targets. Probably.
+
+    def __str__(self):
+        return ".".join(self.names)
