@@ -32,7 +32,7 @@ def _do_layout( cb, parentcb, offset ):
     local_extent = 0
     for line in cb.lines:
         if isinstance(line,LocalVar):
-            local_extent += 1
+            local_extent += line.type.size
     cb.stackextent = local_extent
     local_offset = 0
     for line in cb.lines:
@@ -40,7 +40,7 @@ def _do_layout( cb, parentcb, offset ):
         if isinstance(line,LocalVar):
             line.offset = (offset+1)-(local_extent-local_offset)
             #print(f"Total offset of {line.name} is {line.offset} (local_extent={local_extent}")
-            local_offset += 1
+            local_offset += line.type.size
         elif isinstance(line,CodeBlock):
             _do_layout( line, cb, offset-local_extent )
         elif isinstance(line,Assignment):

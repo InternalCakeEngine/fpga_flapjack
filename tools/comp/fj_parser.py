@@ -204,7 +204,7 @@ class CollectElements(Transformer):
         return ExpNode( op, [o1] )
 
     def exp_identifier( self, i ):
-        return ExpNode( ExpNode.IDEN, [i.value] )
+        return ExpNode( ExpNode.IDEN, [i] )
 
     def exp_literal( self, l ):
         return ExpNode( ExpNode.LIT, [l.value] )

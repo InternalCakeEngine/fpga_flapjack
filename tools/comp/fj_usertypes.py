@@ -22,19 +22,23 @@ def fj_buildtypes( proot ):
             user_types[entity.name] = "exists";
     # If we supported arbitrary typedefs we'd do that here too.
     # Grovel over all the source, changing parsed structures to working structures.
-    for entity in proot:
-        if isinstance(entity,FunctionDef):
-            entity.return_type = _replace_typing(entity.return_type)
-            _replace_typing_in_codeblock( entity.code )
-        elif isinstance(entity,LocalVar):
-            _replace_typing_in_local( entity )
-        elif isinstance(entity,StructDef):
-            _replace_typing_in_structdef( entity )
-    # Then actually construct any user types.
-    for entity in proot:
-        if isinstance(entity,StructDef):
-            new_struct = _build_struct( entity )
-            user_types[new_struct.name] = new_struct
+    #print(">>>build types")
+    for tpass in range(0,2):
+        for entity in proot:
+            #print(f"  {entity}  {type(entity)}")
+            if isinstance(entity,FunctionDef):
+                entity.return_type = _replace_typing(entity.return_type)
+                _replace_typing_in_codeblock( entity.code )
+            elif isinstance(entity,LocalVar):
+                _replace_typing_in_local( entity )
+            elif isinstance(entity,StructDef):
+                _replace_typing_in_structdef( entity )
+        if tpass==0:
+            # Then actually construct any user types but only the first time around
+            for entity in proot:
+                if isinstance(entity,StructDef):
+                    new_struct = _build_struct( entity )
+                    user_types[new_struct.name] = new_struct
 
 def _replace_typing_in_codeblock( cb ):
     for line in cb.lines:
@@ -75,19 +79,19 @@ def _replace_typing_in_structdef( sd ):
         elem.elemtype = _replace_typing(elem.elemtype)
 
 def _replace_typing( parsed_type ):
-    print(f"Try to replace {type(parsed_type)} {parsed_type}")
+    #print(f"Try to replace {type(parsed_type)} {parsed_type}")
     if isinstance(parsed_type,SimpleTypeUse):
         return SimpleType(parsed_type.typename)
     elif isinstance(parsed_type,RefTypeUse):
         return RefType( _replace_typing(parsed_type.warpped) )
     elif isinstance(parsed_type,UserTypeUse):
         for utk in user_types:
-            print(f"parsed_type: {type(parsed_type)} {parsed_type}")
             if utk == parsed_type.typename:
-                return user_types[utk]
-    else:
-        print(f"Failed to look up user type {parsed_type.name}.")
-        exit(1)
+                if isinstance(user_types[utk],str) and user_types[utk]=="exists":
+                    return parsed_type
+                else:
+                    return user_types[utk]
+    return parsed_type
 
 def _build_struct( td ):
     new_struct = StructType( td.name )
@@ -99,9 +103,27 @@ def _build_struct( td ):
         elif elem.elemtype == RefType(SimpleType("int16")):
             new_struct.elems.append( StructTypeElem(elem.name,elem.elemtype,offset ) )
             offset += 1
-        else:
+        else:   # Support for nested structs would go here.
             print(f"Typeof elem.elemtype {type(elem.elemtype)}")
             print(f"Unable to add type {elem.elemtype} to struct {td.name}")
             exit(1)
+    new_struct.size = offset     # Only until we have nested structs.
     return new_struct
+
+def find_var_offset( varline, name ):
+    typedef = varline.type
+    res = varline.offset
+    if isinstance(typedef,StructType):
+        res =  varline.offset+find_offset_in_struct(typedef,name.names[1:],res)
+    #print(f"Offset of {name.names} is {res}")
+    return res
+    
+def find_offset_in_struct( st, namelist, sofar ):
+    if namelist==[]:
+        return sofar
+    for elem in st.elems:
+        if elem.name==namelist[0]:
+            return find_offset_in_struct( elem.utype, namelist[1:], elem.offset )
+    print(f"Unable to find element {namelist[0]} in struct.")
+    exit(1)
 

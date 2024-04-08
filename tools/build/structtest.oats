@@ -1,0 +1,15 @@
+structure pair -> {
+    first   -> int16;
+    second  -> int16;
+}
+
+function use(empty) -> empty {
+    var mypair -> pair;
+    let mypair.first = 1;
+    let mypair.second = 2;
+    var x -> int16;
+    let x = mypair.first + mypair.second;
+    let mypair.first = mypair.first +x;
+    return empty;
+}
+

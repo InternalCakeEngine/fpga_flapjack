@@ -116,7 +116,7 @@ class StructDef():
         self.elemlist = elemlist
 
     def __str__(self):
-        return f"struct {self.name} {{ [e for e in self.elemlist] }}"
+        return f"struct {self.name} {{ {''.join([str(e)+'; ' for e in self.elemlist])} }}"
 
 class StructElemDef():
     def __init__(self,name,elemtype):

@@ -15,6 +15,7 @@
 
 from fj_parsed_classes import *
 from fj_ir_classes import *
+from fj_usertypes import find_var_offset
 
 def fj_compile( proot ):
     label_state = { "next": 0 }
@@ -65,7 +66,8 @@ def _compile_block( cb, ssa_state, label_state, is_top_level ):
             codeline.exp.dest_sa = dest_sa
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
             if assigned_var:
-                exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",assigned_var.offset)) ]
+                varoffset = find_var_offset( assigned_var, codeline.name )
+                exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",varoffset)) ]
             codeline.compiled = exp_code
         elif isinstance(codeline,Return):
             if codeline.exp == None:
@@ -144,7 +146,8 @@ def compile_expression(cb,exp,ssa_state,label_state):
         if idenvar == None:
             print(f"Failed to find variable {exp.operands[0]}")
             exit(1)
-        output.append( IrStep("load", [IrLoc("l",idenvar.offset)], IrLoc("sa",exp.dest_sa)) )
+        varoffset = find_var_offset( idenvar, exp.operands[0] )
+        output.append( IrStep("load", [IrLoc("l",varoffset)], IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.LIT:
         output.append( IrStep("const", [IrLoc("lab",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.CALL:
