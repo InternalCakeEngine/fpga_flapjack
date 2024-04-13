@@ -26,17 +26,17 @@ class CodeBlock():
         self.offset = 0
         self.parent = None
 
-    def find_var_by_name( self, iden ):
+    def find_var_by_name( self, varname ):
         for line in self.lines:
-            if isinstance(line,LocalVar) and line.name==iden.names[0]:
+            if isinstance(line,LocalVar) and line.name==varname:
                 return line
         if self.parent:
             if isinstance(self.parent,list):
                 for param in self.parent:
-                    if param.name==iden.names[0]:
+                    if param.name==varname:
                         return param
             else:
-                return self.parent.find_var_by_name(iden)
+                return self.parent.find_var_by_name(varname)
         else:
             # We should look in the global namespace here but we have no route to it (yet).
             pass
@@ -61,9 +61,10 @@ class LocalVar(CodeLine):
 
 # An assignment statement.
 class Assignment(CodeLine):
-    def __init__(self,name,exp):
+    def __init__(self,name,exp,op):
         self.name = name
         self.exp = exp
+        self.op = op
 
 # A while loop.
 class WhileLoop(CodeLine):
@@ -88,6 +89,8 @@ class ExpNode():
     IDEN = "iden"
     LIT = "lit"
     CALL = "call"
+    REF = "ref"
+    DEREF = "deref"
     EMPTY = "empty"
     def __init__(self,operator,operands):
         self.operator = operator

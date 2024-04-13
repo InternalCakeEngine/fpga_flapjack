@@ -15,7 +15,7 @@
 
 from fj_parsed_classes import *
 from fj_ir_classes import *
-from fj_usertypes import find_var_offset
+from fj_usertypes import find_var_info
 
 def fj_compile( proot ):
     label_state = { "next": 0 }
@@ -55,19 +55,27 @@ def _compile_block( cb, ssa_state, label_state, is_top_level ):
     for codeline in cb.lines:
         codeline.compiled = None
         if isinstance(codeline,Assignment):
-            if codeline.name == "_":
+            if len(codeline.name.names)==1 and codeline.name.names[0] == "_":
                 assigned_var = None
             else:
-                assigned_var = cb.find_var_by_name( codeline.name )
+                assigned_var = cb.find_var_by_name( codeline.name.names[0] )
                 if assigned_var == None:
-                    print(f"Failed to find variable {codeline.name}")
+                    print(f"Failed to find variable {codeline.name} for assignment")
                     exit(1)
             dest_sa = get_next_sa(ssa_state)
             codeline.exp.dest_sa = dest_sa
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
             if assigned_var:
-                varoffset = find_var_offset( assigned_var, codeline.name )
-                exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",varoffset)) ]
+                if codeline.op == "=":
+                    (varoffset,vartype) = find_var_info( assigned_var, codeline.name )
+                    exp_code += [ IrStep("store",[IrLoc("sa",dest_sa)],IrLoc("l",varoffset)) ]
+                else:
+                    (varoffset,vartype) = find_var_info( assigned_var, codeline.name )
+                    addr_sa = get_next_sa(ssa_state)
+                    exp_code += [
+                        IrStep("load",[IrLoc("l",varoffset)], IrLoc("sa",addr_sa)),
+                        IrStep("storeto", [IrLoc("sa",dest_sa),IrLoc("sa",addr_sa)], None)
+                    ]
             codeline.compiled = exp_code
         elif isinstance(codeline,Return):
             if codeline.exp == None:
@@ -142,12 +150,27 @@ def compile_return(sa,spdelta,isempty):
 def compile_expression(cb,exp,ssa_state,label_state):
     output = []
     if exp.operator == ExpNode.IDEN:
-        idenvar = cb.find_var_by_name( exp.operands[0] )
+        idenvar = cb.find_var_by_name( exp.operands[0].names[0] )
         if idenvar == None:
-            print(f"Failed to find variable {exp.operands[0]}")
+            print(f"Failed to find variable {exp.operands[0]} for identifier")
             exit(1)
-        varoffset = find_var_offset( idenvar, exp.operands[0] )
+        (varoffset,vartype) = find_var_info( idenvar, exp.operands[0] )
         output.append( IrStep("load", [IrLoc("l",varoffset)], IrLoc("sa",exp.dest_sa)) )
+    elif exp.operator == ExpNode.REF:
+        if exp.operands[0].operator != ExpNode.IDEN:
+            print(f"Can't take reference of {exp.operands[0]}")
+            exit(1)
+        idenvar = cb.find_var_by_name( exp.operands[0].operands[0].names[0] )
+        if idenvar == None:
+            print(f"Failed to find variable {exp.operands[0]} for reference taking")
+            exit(1)
+        (varoffset,vartype) = find_var_info( idenvar, exp.operands[0] )
+        output.append( IrStep("addr", [IrLoc("l",varoffset)], IrLoc("sa",exp.dest_sa)) )
+    elif exp.operator == ExpNode.DEREF:
+        operand.dest_sa = get_next_sa(ssa_state)
+        operand.code = compile_expression(cb,exp.operand[0],ssa_state,label_state)
+        output += operand.code
+        output.append( IrStep("load", [IrLoc("sa",operand.dest_sa)], IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.LIT:
         output.append( IrStep("const", [IrLoc("lab",exp.operands[0])],IrLoc("sa",exp.dest_sa)) )
     elif exp.operator == ExpNode.CALL:

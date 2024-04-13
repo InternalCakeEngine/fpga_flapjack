@@ -1,0 +1,15 @@
+function side_effect( myref -> ref(int16) ) -> empty {
+    let myref <= 2;
+    return empty;
+}
+
+function passref( empty ) -> empty {
+    var x -> int16;
+    let x = 1;
+    var rx -> ref(int16);
+    let rx = ref(x);
+    let _ = side_effect( rx );
+    return x;
+}
+
+

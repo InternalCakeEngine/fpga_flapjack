@@ -52,6 +52,13 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
                 lines.append(f"  st  {src.iden}, sp[{stack_offset+dst.iden}]")
             else:
                 lines.append(f"  BAD STORE: {stepir.pretty()}")
+        elif stepir.op == "storeto":
+            src = stepir.srcs[0]
+            dst = stepir.srcs[1]    # Because the actual dest in memory.
+            if src.itype=="r" and dst.itype=="r":
+                lines.append(f"  st  {src.iden}, {dst.iden}")
+            else:
+                lines.append(f"  BAD STORE: {stepir.pretty()}")
         elif stepir.op == "call":
             param_count = len(stepir.srcs[1:])
             savelist = [ save for save in  list(step["inuse"]) if save not in [p.iden for p in stepir.srcs[1:]] ]
@@ -68,6 +75,14 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
             lines.append(f"  add {len(pushlist)}, sp");
             if stepir.dst.iden:
                 lines.append(f"  mov r0, {stepir.dst.iden}")
+        elif stepir.op == "addr":
+            src = stepir.srcs[0]
+            dst = stepir.dst
+            if src.itype=="l" and dst.itype=="r":
+                lines.append(f"  mov sp, {dst.iden}")
+                lines.append(f"  add {stack_offset+src.iden}, {dst.iden}")
+            else:
+                lines.append(f"  BAD ADDR  {src.itype} {dst.itype}")
         elif stepir.op == "add":
             src1 = stepir.srcs[0]
             src2 = stepir.srcs[1]

@@ -59,7 +59,8 @@ code_line: code_block                                                           
 
 var_decl_line: "var" IDENTIFIER "->" type_name ";"                                          -> var_declaration
 
-assignment_line: "let" assign_target "=" expression ";"                                     -> assignment
+assignment_line: ( "let" assign_target "=" expression ";" )                                 -> assignment
+               | ( "let" assign_target "<=" expression ";" )                                -> assignment_into
 
 assign_target: staged_identifier                                                            -> simple_assign_target
              | staged_identifier subscript_list                                             -> subscripted_assign_target
@@ -84,7 +85,9 @@ index: expression subscript_list                                                
 subscript_list: "[" expression "]"                                                          -> childobj_list
               | ( "[" expression "]" subscript_list )                                       -> childobjpair_list
 
-reference: "{" expression "}"                                                               -> exp_reference
+reference: "ref" "(" expression ")"                                                         -> exp_reference
+
+dereference: "deref" "(" expression ")"                                                     -> exp_derefernce
 
 function_call: IDENTIFIER "(" call_params_or_not ")"                                        -> exp_call
 
@@ -162,7 +165,10 @@ class CollectElements(Transformer):
         return CodeBlock(linelist)
 
     def assignment( self, name, exp ):
-        return Assignment( name, exp )
+        return Assignment( name, exp, "=" )
+
+    def assignment_into( self, name, exp ):
+        return Assignment( name, exp, "<=" )
 
     def while_loop( self, exp, code_block ):
         return WhileLoop( exp, code_block )
@@ -189,13 +195,16 @@ class CollectElements(Transformer):
         return expression
 
     def exp_call( self, name, params ):
-        return ExpNode( ExpNode.CALL, [name]+params )
+        return ExpNode( ExpNode.CALL, [name.value]+params )
 
     def exp_index( self, exp, sublist ):
         return ExpSubscript(exp,sublist)
 
     def exp_reference( self, exp ):
-        return ExpRef(exp)
+        return ExpNode( ExpNode.REF, [exp] )
+
+    def exp_dereference( self, exp ):
+        return ExpNode( ExpNode.DEREF, [exp] )
 
     def exp_binary( self, o1, op, o2 ):
         return ExpNode( op, [o1,o2] )

@@ -28,7 +28,7 @@ def fj_buildtypes( proot ):
             #print(f"  {entity}  {type(entity)}")
             if isinstance(entity,FunctionDef):
                 entity.return_type = _replace_typing(entity.return_type)
-                _replace_typing_in_codeblock( entity.code )
+                _replace_typing_in_codeblock( proot, entity.code )
             elif isinstance(entity,LocalVar):
                 _replace_typing_in_local( entity )
             elif isinstance(entity,StructDef):
@@ -40,37 +40,37 @@ def fj_buildtypes( proot ):
                     new_struct = _build_struct( entity )
                     user_types[new_struct.name] = new_struct
 
-def _replace_typing_in_codeblock( cb ):
+def _replace_typing_in_codeblock( proot, cb ):
     for line in cb.lines:
         if isinstance(line,LocalVar):
             line.type=_replace_typing(line.type)
         elif isinstance(line,IfElse):
-            _replace_typing_in_codeblock(line.code_block_if)
-            _replace_typing_in_codeblock(line.code_block_else)
+            _replace_typing_in_codeblock(proot,line.code_block_if)
+            _replace_typing_in_codeblock(proot,line.code_block_else)
         elif isinstance(line,WhileLoop):
-            _replace_typing_in_codeblock(line.code_block)
+            _replace_typing_in_codeblock(proot,line.code_block)
         elif isinstance(line,Assignment):
-            _replace_typing_in_expression(line.exp)
+            _replace_typing_in_expression(proot,cb,line.exp)
 
-def _replace_typing_in_expression( exp ):
+def _replace_typing_in_expression( proot, cb, exp ):
     if isinstance(exp,ExpOp):
         pass
     if isinstance(exp,ExpNode):
         if exp.operator == ExpNode.IDEN:
-            exp.utype = _find_type_of_identifier(exp.operands[0]);
+            exp.utype = _find_type_of_identifier(cb,exp.operands[0]);
         elif exp.operator == ExpNode.LIT:
             exp.utype = SimpleType("int16")
         elif exp.operator == ExpNode.CALL:
-            exp.utype = _find_type_of_function(exp.operands[0]);
+            exp.utype = _find_type_of_function(proot,exp.operands[0]);
             for o in exp.operands[1:]:
-                _replace_typing_in_expression(o);
+                _replace_typing_in_expression(proot, cb, o);
         elif exp.operator == ExpNode.EMPTY:
             exp.utype = SimpleType("empty")
     elif isinstance(exp,ExpSubsript):
         for o in exp.sublist:
-            _replace_typing_in_expression(o);
+            _replace_typing_in_expression(proot, cb, o);
     elif isinstance(exp,ExpRef):
-        _replace_typing_in_expression(exp.exp)
+        _replace_typing_in_expression(proot, cb, exp.exp)
         exp.utype = RefType(exp.exp.utype)
         pass
 
@@ -83,7 +83,7 @@ def _replace_typing( parsed_type ):
     if isinstance(parsed_type,SimpleTypeUse):
         return SimpleType(parsed_type.typename)
     elif isinstance(parsed_type,RefTypeUse):
-        return RefType( _replace_typing(parsed_type.warpped) )
+        return RefType( _replace_typing(parsed_type.wrapped) )
     elif isinstance(parsed_type,UserTypeUse):
         for utk in user_types:
             if utk == parsed_type.typename:
@@ -110,13 +110,13 @@ def _build_struct( td ):
     new_struct.size = offset     # Only until we have nested structs.
     return new_struct
 
-def find_var_offset( varline, name ):
-    typedef = varline.type
-    res = varline.offset
-    if isinstance(typedef,StructType):
-        res =  varline.offset+find_offset_in_struct(typedef,name.names[1:],res)
+def find_var_info( varline, name ):
+    vartype = varline.type
+    offset = varline.offset
+    if isinstance(vartype,StructType):
+        offset =  varline.offset+find_offset_in_struct(vartype,name.names[1:],res)
     #print(f"Offset of {name.names} is {res}")
-    return res
+    return (offset,vartype)
     
 def find_offset_in_struct( st, namelist, sofar ):
     if namelist==[]:
@@ -127,3 +127,21 @@ def find_offset_in_struct( st, namelist, sofar ):
     print(f"Unable to find element {namelist[0]} in struct.")
     exit(1)
 
+def _find_type_of_function( proot, tgtname ):
+    for entity in proot:
+        if isinstance(entity,FunctionDef) and entity.name==tgtname:
+            return entity.return_type
+    print(f"Failed to find return type of function {tgtname}")
+    exit(-1)
+
+def _find_type_of_identifier( cb, op ):
+    for line in cb.lines:
+        if isinstance(line,LocalVar) and line.name==op.names[0]:
+            return line.type
+    if cb.parent:
+        return _find_type_of_identifier(cb.parent,op)
+    return None
+
+
+
+    
