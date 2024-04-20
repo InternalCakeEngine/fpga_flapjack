@@ -106,7 +106,6 @@ module flapjack(
     flapjack_sdcard sdcard (
         .clk_sys,       // 125 MHz systemclock
         .reset,         // Reset when high.
-        .sd_status,     // 8 bit status infor
         .sd_cs,
         .sd_mosi,
         .sd_miso,
@@ -117,6 +116,7 @@ module flapjack(
         .sd_bufdata_in,         // 16 bit data to read from buffer.
         .sd_bufdata_out,        // 16 bit data to write to buffer
         .sd_writestrobe,        // Buffer write stobe
+        .sd_status,             // 8 bit status infor
         .sd_cmd,                // 8 bit commmand
         .sd_cmddata             // 8 bit commmand data
     );
