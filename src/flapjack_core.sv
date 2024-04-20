@@ -21,12 +21,21 @@
 
 
 module flapjack_core(
-        input  wire  logic   clk_sys,           // 125 MHz system clock
-        input  wire  logic   reset,             // Reset when high.
+        input wire  logic   clk_sys,           // 125 MHz system clock
+        input wire  logic   reset,             // Reset when high.
+        // Textmode interface.
         output       logic   [6:0] char_x,      // Write location x
         output       logic   [5:0] char_y,      // Write location y
         output       logic   [8:0] char_chr,    // Write character
-        output       logic   char_str           // Write strobe.
+        output       logic   char_str,          // Write strobe.
+        // SD card interface.
+        input wire  logic           sd_status,             // 8 bit status infor
+        output      logic [8:0]     sd_buffaddr,           // Address is block buffer to read/write.
+        input wire  logic [15:0]    sd_bufdata_in,         // 16 bit data to read from buffer.
+        output      logic [15:0]    sd_bufdata_out,        // 16 bit data to write to buffer
+        output      logic           sd_writestrobe,        // Buffer write stobe
+        output      logic           sd_cmd,                // 8 bit commmand
+        output      logic           sd_cmddata             // 8 bit commmand data        
     );
     
     // Super simple output device that should really be somewhere else.

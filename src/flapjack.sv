@@ -22,13 +22,19 @@
 
 // Collect the pins needed for the whole systems.
 module flapjack(
-    input  wire logic clk_100m,     // 100 MHz clock
-    input  wire logic btn_rst_n,    // reset button
-    output      logic vga_hsync,    // VGA horizontal sync
-    output      logic vga_vsync,    // VGA vertical sync
+    input  wire logic       clk_100m,     // 100 MHz clock
+    input  wire logic       btn_rst_n,    // reset button
+    output      logic       vga_hsync,    // VGA horizontal sync
+    output      logic       vga_vsync,    // VGA vertical sync
     output      logic [3:0] vga_r,  // 4-bit VGA red
     output      logic [3:0] vga_g,  // 4-bit VGA green
-    output      logic [3:0] vga_b   // 4-bit VGA blue
+    output      logic [3:0] vga_b,  // 4-bit VGA blue
+    output                  sd_cs,
+    output                  sd_mosi,
+    input wire logic        sd_miso,
+    input wire logic        sd_clk,
+    input wire logic        sd_cd,
+    input wire logic        sd_wp
     );
     
     // generate system clock
@@ -70,13 +76,49 @@ module flapjack(
         reset = ~btn_rst_n;
     end
     
+    // Control link between core and SD card.
+    logic           sd_status;
+    logic [8:0]     sd_buffaddr;
+    logic [15:0]    sd_bufdata_in;
+    logic [15:0]    sd_bufdata_out;
+    logic           sd_writestrobe;
+    logic           sd_cmd;
+    logic           sd_cmddata;        
+    
     flapjack_core core (
         .clk_sys,       // 125 MHz system clock
         .reset,         // Reset when high.
+        // Textmode interface
         .char_x,        // Write location x
         .char_y,        // Write location y
         .char_chr,      // Write character
-        .char_str       // Write strobe.
+        .char_str,      // Write strobe.
+        // SDCard interface
+        .sd_status,             // 8 bit status infor
+        .sd_buffaddr,           // Address is block buffer to read/write.
+        .sd_bufdata_in,         // 16 bit data to read from buffer.
+        .sd_bufdata_out,        // 16 bit data to write to buffer
+        .sd_writestrobe,        // Buffer write stobe
+        .sd_cmd,                // 8 bit commmand
+        .sd_cmddata             // 8 bit commmand data        
+    );
+    
+    flapjack_sdcard sdcard (
+        .clk_sys,       // 125 MHz systemclock
+        .reset,         // Reset when high.
+        .sd_status,     // 8 bit status infor
+        .sd_cs,
+        .sd_mosi,
+        .sd_miso,
+        .sd_clk,
+        .sd_cd,
+        .sd_wp,
+        .sd_buffaddr,           // Address is block buffer to read/write.
+        .sd_bufdata_in,         // 16 bit data to read from buffer.
+        .sd_bufdata_out,        // 16 bit data to write to buffer
+        .sd_writestrobe,        // Buffer write stobe
+        .sd_cmd,                // 8 bit commmand
+        .sd_cmddata             // 8 bit commmand data
     );
 
 endmodule
