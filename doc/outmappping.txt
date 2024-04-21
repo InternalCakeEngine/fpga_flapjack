@@ -1,0 +1,17 @@
+The OUT instruction has 32 bits of output on eah invocation, split between
+a 16 bit address and a 16 bit data value. The IN instruction has the same
+16 bit address and collects a 16 bit data item.
+
+We segregate this space according to address.
+
+Address Access  Purpose
+0x0000  W       Textmode x/y position 8:8 (freely writable)
+0x0001  W       Textmode character (writing causes strobe)
+
+0x0100  R       SD card status.
+0x0101  W       SD card command
+0x0102  W       SD command data (LO)
+0x0103  W       SD command data (HI)
+0x0104  W       SD command address.
+
+

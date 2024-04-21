@@ -187,11 +187,13 @@ module flapjack_sdcard(
                     shifting_in_count = 40;
                     shiftreg = 48'b01_000000_00000000_00000000_00000000_00000000_1001010_1;
                     start_shifting <= 1;
+                    sd_status <= 0;
                     cmdstate = STARTING_WORK;
                 end
             end
             STARTING_WORK: begin
                 if( shiftstate != HALTED ) begin
+                    start_shifting <= 0;
                     cmdstate <= WORKING;
                 end
             end

@@ -342,14 +342,21 @@ module flapjack_core(
                                 core_state <= STEP;
                             end
                             OP_OUT: begin
-                                if( opmode ) begin
-                                    out_char <= {4'b0,op1_raw};
-                                end else begin
-                                    out_char <= op1[7:0];
-                                end
-                                write_x <= op2[15:8];
-                                write_y <= op2[7:0];
-                                out_char_strobe <= 1;
+                                // All of these should really be on some kind of bus system.
+                                case( op2 )
+                                    16'h0000: begin
+                                        write_x <= op1[15:8];
+                                        write_y <= op1[7:0];
+                                    end
+                                    16'h0001: begin
+                                        out_char <= op1[7:0];
+                                        out_char_strobe <= 1;
+                                    end
+                                    16'h0101: begin
+                                        sd_cmd <= op1;
+                                    end
+                                    default: begin end
+                                endcase
                                 core_state <= STEP;
                             end
                             OP_CONST: begin
