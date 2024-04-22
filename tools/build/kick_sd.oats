@@ -1,0 +1,21 @@
+function wait_and_kick( empty ) -> empty {
+    var busy -> int16;
+    let busy = 0;
+    while( busy<1000 ) {
+        let busy = busy+1;
+    }
+    let _ = do_kick(empty);
+    while( 1 ) {
+    }
+    return empty;
+}
+
+_asm("do_kick:");
+_asm("  const hi(0x0101), r0");
+_asm("  const lo(0x0101), r0");
+_asm("  const hi(0x0001), r1");
+_asm("  const lo(0x0001), r1");
+_asm("  out r1, r0");
+_asm("  ret 0");
+
+
