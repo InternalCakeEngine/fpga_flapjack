@@ -121,6 +121,7 @@ fmt2 = {
     "shr":10,
     "shl":10,
     "mov":11,
+    "in":12,
 }
 
 fmt3 = {
@@ -244,6 +245,7 @@ def do_assembly( filename, lines ):
                 val = (opcode<<12) | (subcode<<8) | c
             elif instr[0] in fmt5:
                 opstr = ops[0]
+                c=0
                 try:
                     c = int(opstr,0)
                     if c>127 or c<-128:

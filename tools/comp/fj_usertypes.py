@@ -131,8 +131,7 @@ def _find_type_of_function( proot, tgtname ):
     for entity in proot:
         if isinstance(entity,FunctionDef) and entity.name==tgtname:
             return entity.return_type
-    print(f"Failed to find return type of function {tgtname}")
-    exit(-1)
+    return SimpleType("empty")
 
 def _find_type_of_identifier( cb, op ):
     for line in cb.lines:

@@ -110,11 +110,11 @@ def _compile_block( cb, ssa_state, label_state, is_top_level ):
         elif isinstance(codeline,IfElse):
             codeline.exp.dest_sa = get_next_sa(ssa_state)
             exp_code = compile_expression(cb,codeline.exp,ssa_state,label_state)
-            codeline.code_block.stackextent = cb.stackextent
+            codeline.code_block_if.stackextent = cb.stackextent
             body_code_if   = _compile_block( codeline.code_block_if,   ssa_state, label_state, False )
             body_code_else = None
             if codeline.code_block_else:
-                codeline.code_block.stackextent = cb.stackextent
+                codeline.code_block_else.stackextent = cb.stackextent
                 body_code_else = _compile_block( codeline.code_block_else, ssa_state, label_state, False )
             else_label = get_next_label(label_state)
             end_label = get_next_label(label_state)
@@ -204,7 +204,7 @@ def compile_expression(cb,exp,ssa_state,label_state):
             ]
         elif exp.operator.op=="!=" or exp.operator.op=="==":
             hop_label = get_next_label(label_state)
-            if exp.operator.op == "!=":
+            if exp.operator.op == "==":
                 v1 = 1
                 v2 = 0
             else:

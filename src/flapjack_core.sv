@@ -29,13 +29,13 @@ module flapjack_core(
         output       logic   [8:0] char_chr,    // Write character
         output       logic   char_str,          // Write strobe.
         // SD card interface.
-        input wire  logic           sd_status,             // 8 bit status infor
-        output      logic [8:0]     sd_buffaddr,           // Address is block buffer to read/write.
+        input wire  logic [8:0]     sd_status,             // 8 bit status infor
+        output      logic [8:0]     sd_buffaddr,           // Address in block buffer to read/write.
         input wire  logic [15:0]    sd_bufdata_in,         // 16 bit data to read from buffer.
         output      logic [15:0]    sd_bufdata_out,        // 16 bit data to write to buffer
         output      logic           sd_writestrobe,        // Buffer write stobe
-        output      logic           sd_cmd,                // 8 bit commmand
-        output      logic           sd_cmddata             // 8 bit commmand data        
+        output      logic [7:0]     sd_cmd,                // 8 bit commmand
+        output      logic [15:0]     sd_cmddata             // 8 bit commmand data        
     );
     
     // Super simple output device that should really be somewhere else.
@@ -105,6 +105,7 @@ module flapjack_core(
     localparam OP_CONST = 9;
     localparam OP_BITS = 10;
     localparam OP_MOV = 11;
+    localparam OP_IN = 12;
 
     // Extra opcode names (major opcode=OP_EXT)
     localparam EXTOP_NOP = 0;
@@ -169,6 +170,10 @@ module flapjack_core(
         end else begin
             if( reset ) begin
                 core_state <= RESET;
+                for( int r=0; r<16; r++ ) begin
+                    regs[r] <= 0;
+                end 
+                regs[0] <= 0;
             end else begin
                 case( core_state )
                     RESET: begin
@@ -353,9 +358,26 @@ module flapjack_core(
                                         out_char_strobe <= 1;
                                     end
                                     16'h0101: begin
-                                        sd_cmd <= op1;
+                                        sd_cmd <= op1[7:0];
+                                    end
+                                    16'h0102: begin
+                                        sd_cmddata <= op1[15:0];
                                     end
                                     default: begin end
+                                endcase
+                                core_state <= STEP;
+                            end
+                            OP_IN: begin
+                                case( op1 )
+                                    16'h0100: begin
+                                        regs[op2_raw] <= sd_status;
+                                    end
+                                    16'h0101: begin
+                                        regs[op2_raw] <= sd_cmd;
+                                    end
+                                    default: begin
+                                        regs[op2_raw] <= 0;
+                                    end
                                 endcase
                                 core_state <= STEP;
                             end
@@ -466,6 +488,13 @@ module flapjack_core(
                 68: begin char_x <= 4; char_y <= 16; char_chr <= instr[11:8]+48; char_str <= 1; end
                 69: begin char_x <= 5; char_y <= 16; char_chr <= instr[7:4]+48; char_str <= 1; end
                 70: begin char_x <= 6; char_y <= 16; char_chr <= instr[3:0]+48; char_str <= 1; end
+
+                71: begin char_x <= 3; char_y <= 17; char_chr <= sd_status[8:8]+48; char_str <= 1; end
+                72: begin char_x <= 4; char_y <= 17; char_chr <= sd_status[7:4]+48; char_str <= 1; end
+                73: begin char_x <= 5; char_y <= 17; char_chr <= sd_status[3:0]+48; char_str <= 1; end
+                74: begin char_x <= 7; char_y <= 17; char_chr <= sd_cmd[7:4]+48; char_str <= 1; end
+                75: begin char_x <= 8; char_y <= 17; char_chr <= sd_cmd[3:0]+48; char_str <= 1; end
+
     
                 default: begin end
             endcase

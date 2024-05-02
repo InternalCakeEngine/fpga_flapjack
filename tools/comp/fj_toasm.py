@@ -71,7 +71,7 @@ def _toasm_func( funcname, funcir, initial_stack_extent ):
             lines.append(f"  call r0")
             savelist.reverse()
             for i,save in enumerate(savelist):
-                lines.append(f"  ld {save}, sp[{len(pushlist)-(i+1)}]")
+                lines.append(f"  ld sp[{len(pushlist)-(i+1)}], {save}")
             lines.append(f"  add {len(pushlist)}, sp");
             if stepir.dst.iden:
                 lines.append(f"  mov r0, {stepir.dst.iden}")

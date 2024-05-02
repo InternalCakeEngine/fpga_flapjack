@@ -29,12 +29,12 @@ module flapjack(
     output      logic [3:0] vga_r,  // 4-bit VGA red
     output      logic [3:0] vga_g,  // 4-bit VGA green
     output      logic [3:0] vga_b,  // 4-bit VGA blue
-    output                  sd_cs,
-    output                  sd_mosi,
-    input wire logic        sd_miso,
-    input wire logic        sd_clk,
-    input wire logic        sd_cd,
-    input wire logic        sd_wp
+    output      logic       sd_cs,
+    output      logic       sd_mosi,
+    input wire  logic       sd_miso,
+    output      logic       sd_clk,
+    input wire  logic       sd_cd,
+    input wire  logic       sd_wp
     );
     
     // generate system clock
@@ -77,13 +77,13 @@ module flapjack(
     end
     
     // Control link between core and SD card.
-    logic           sd_status;
+    logic [8:0]     sd_status;
     logic [8:0]     sd_buffaddr;
     logic [15:0]    sd_bufdata_in;
     logic [15:0]    sd_bufdata_out;
     logic           sd_writestrobe;
-    logic           sd_cmd;
-    logic           sd_cmddata;        
+    logic [7:0]     sd_cmd;
+    logic [15:0]    sd_cmddata;        
     
     flapjack_core core (
         .clk_sys,       // 125 MHz system clock

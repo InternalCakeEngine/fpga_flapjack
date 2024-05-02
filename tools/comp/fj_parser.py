@@ -50,6 +50,7 @@ builtin_typename: "int16"                                                       
                 | "empty"                                                                   -> simpletype_empty
 
 code_block: "{" code_line_list "}"                                                          -> ordered_code_block
+          | "{" "}"                                                                         -> empty_code_block
 
 code_line_list: code_line                                                                   -> childobj_list
               | ( code_line code_line_list )                                                -> childobjpair_list
@@ -164,6 +165,9 @@ class CollectElements(Transformer):
     def ordered_code_block(self,linelist):
         return CodeBlock(linelist)
 
+    def empty_code_block(self):
+        return CodeBlock([])
+
     def assignment( self, name, exp ):
         return Assignment( name, exp, "=" )
 
@@ -261,13 +265,21 @@ class CollectElements(Transformer):
         return Identifier([name.value],[]);
 
     def concat_identifier( self, name, rest ):
-        return Identifier( name.names+rest.names, [] )
+        if rest:
+            res = Identifier( name.names+rest.names, [] )
+        else:
+            res = Identifier( name.names, [] )
+        return res
 
     def simple_assign_target( self, target ):
         return Identifier( target.names, [] )
 
     def subscripted_assign_target( self, target, rest ):
-        return Identifier( target.names+rest.names )
+        if rest:
+            res = Identifier( target.names+rest.names )
+        else:
+            res = Identifier( target.names )
+        return res
 
 try:
     _fj_generated = Lark( _flapjack_grammar, parser="lalr", transformer=CollectElements() )
